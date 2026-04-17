@@ -586,7 +586,10 @@ function TeacherDashboard() {
       const record = session.records?.find(
         (r) => r.studentId === row.student.id,
       );
-      const status = record?.status || "ABSENT";
+      // Treat PENDING as ABSENT in the export — PENDING means the session
+      // closed before the student was scanned, which counts as absent.
+      const rawStatus = record?.status || "ABSENT";
+      const status = rawStatus === "PENDING" ? "ABSENT" : rawStatus;
       csv += `${no},"${surname}","${first}","${mi}","${status}"${NL}`;
     });
 
