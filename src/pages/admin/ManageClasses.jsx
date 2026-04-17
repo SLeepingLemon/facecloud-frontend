@@ -29,6 +29,7 @@ function ManageClasses() {
     .toUpperCase()
     .slice(0, 2);
 
+  // ── State ──────────────────────────────────────────────────────
   const [sections, setSections] = useState([]);
   const [activeTab, setActiveTab] = useState(location.state?.tab || "subjects");
 
@@ -60,6 +61,7 @@ function ManageClasses() {
     fetchData();
   }, []);
 
+  // ── Fetch ───────────────────────────────────────────────────────
   const fetchData = () => {
     fetchSubjects();
     fetchTeachers();
@@ -88,7 +90,7 @@ function ManageClasses() {
     navigate("/");
   };
 
-  // ── Subjects ──
+  // ── Subjects ────────────────────────────────────────────────────
   const handleSubjectChange = (e) => {
     const { name, value } = e.target;
     setSubjectForm((p) => ({ ...p, [name]: value }));
@@ -256,10 +258,10 @@ function ManageClasses() {
       });
   };
 
-  // ── Teachers ──
+  // ── Teachers ────────────────────────────────────────────────────
   const handleAssignTeacher = () => {
     if (!selectedSubjectForTeacher || !selectedTeacher) {
-      setError("Select both.");
+      setError("Select both a subject and a teacher.");
       return;
     }
     setError("");
@@ -278,7 +280,7 @@ function ManageClasses() {
   };
 
   const handleRemoveTeacher = (subjectId, teacherId) => {
-    if (!window.confirm("Remove this teacher?")) return;
+    if (!window.confirm("Remove this teacher from the subject?")) return;
     api
       .post("/subjects/remove-teacher", { subjectId, teacherId })
       .then(() => {
@@ -288,18 +290,7 @@ function ManageClasses() {
       .catch(() => setError("Failed."));
   };
 
-  // ── Enrollments ──
-  const handleRemoveEnrollment = (subjectId, studentId) => {
-    if (!window.confirm("Remove this student?")) return;
-    api
-      .delete("/subjects/remove-enrollment", { data: { subjectId, studentId } })
-      .then(() => {
-        setSuccess("Removed.");
-        fetchSubjects();
-      })
-      .catch(() => setError("Failed."));
-  };
-
+  // ── Enrollments ─────────────────────────────────────────────────
   const handleEnrollSection = (section) => {
     if (!selectedSubject) {
       setError("Select a subject first.");
@@ -331,8 +322,21 @@ function ManageClasses() {
       });
   };
 
+  const handleRemoveEnrollment = (subjectId, studentId) => {
+    if (!window.confirm("Remove this student from the subject?")) return;
+    api
+      .delete("/subjects/remove-enrollment", { data: { subjectId, studentId } })
+      .then(() => {
+        setSuccess("Student removed.");
+        fetchSubjects();
+      })
+      .catch(() => setError("Failed."));
+  };
+
+  // ── Helpers ─────────────────────────────────────────────────────
   const getDayName = (d) => DAYS[d];
 
+  // ── Render ──────────────────────────────────────────────────────
   return (
     <div className="dashboard">
       <header className="dashboard-header">
@@ -426,11 +430,17 @@ function ManageClasses() {
           </button>
         </div>
 
-        {/* ── SUBJECTS TAB ── */}
+        {/* ══════════════════════════════════════════════════════
+            SUBJECTS TAB
+        ══════════════════════════════════════════════════════ */}
         {activeTab === "subjects" && (
           <div className="tab-content">
+            {/* Add new subject */}
             <div className="management-section">
               <p className="section-title">Add New Subject</p>
+              <p className="section-subtitle">
+                Create a subject and define its weekly schedule.
+              </p>
               <form onSubmit={handleSubjectSubmit}>
                 <div className="form-row">
                   <div className="form-group">
@@ -445,7 +455,7 @@ function ManageClasses() {
                       required
                     />
                     <p className="form-help">
-                      Must match SUBJECT_CODES on the Pi.
+                      Must match SUBJECT_CODES on the Pi exactly.
                     </p>
                   </div>
                   <div className="form-group">
@@ -555,6 +565,7 @@ function ManageClasses() {
               </form>
             </div>
 
+            {/* All subjects list */}
             <div className="management-section">
               <p className="section-title">All Subjects</p>
               {subjects.length === 0 ? (
@@ -569,7 +580,7 @@ function ManageClasses() {
                         <th>Code</th>
                         <th>Name</th>
                         <th>Schedules</th>
-                        <th>Teachers</th>
+                        <th>Teacher(s)</th>
                         <th>Students</th>
                         <th>Actions</th>
                       </tr>
@@ -587,14 +598,18 @@ function ManageClasses() {
                               color: "var(--ink-muted)",
                             }}
                           >
-                            {subject.schedules.length === 0
-                              ? "No schedule"
-                              : subject.schedules.map((s, i) => (
-                                  <div key={i}>
-                                    {getDayName(s.dayOfWeek)} {s.startTime}–
-                                    {s.endTime}
-                                  </div>
-                                ))}
+                            {subject.schedules.length === 0 ? (
+                              <span style={{ color: "var(--ink-faint)" }}>
+                                No schedule
+                              </span>
+                            ) : (
+                              subject.schedules.map((s, i) => (
+                                <div key={i}>
+                                  {getDayName(s.dayOfWeek)} {s.startTime}–
+                                  {s.endTime}
+                                </div>
+                              ))
+                            )}
                           </td>
                           <td style={{ fontSize: "13px" }}>
                             {subject.teachers.length === 0 ? (
@@ -611,6 +626,7 @@ function ManageClasses() {
                             style={{
                               fontSize: "13px",
                               color: "var(--ink-muted)",
+                              textAlign: "center",
                             }}
                           >
                             {subject.enrollments.length}
@@ -652,11 +668,18 @@ function ManageClasses() {
           </div>
         )}
 
-        {/* ── ASSIGN TEACHERS TAB ── */}
+        {/* ══════════════════════════════════════════════════════
+            ASSIGN TEACHERS TAB
+        ══════════════════════════════════════════════════════ */}
         {activeTab === "teachers" && (
           <div className="tab-content">
+            {/* Assign form */}
             <div className="management-section">
               <p className="section-title">Assign Teacher to Subject</p>
+              <p className="section-subtitle">
+                A teacher must be assigned before they can see the subject on
+                their dashboard.
+              </p>
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">Subject</label>
@@ -700,6 +723,7 @@ function ManageClasses() {
               </button>
             </div>
 
+            {/* Current assignments */}
             <div className="management-section">
               <p className="section-title">Current Assignments</p>
               {subjects.every((s) => s.teachers.length === 0) ? (
@@ -734,14 +758,18 @@ function ManageClasses() {
                                 color: "var(--ink-muted)",
                               }}
                             >
-                              {subject.schedules.length === 0
-                                ? "No schedule"
-                                : subject.schedules.map((s, i) => (
-                                    <div key={i}>
-                                      {getDayName(s.dayOfWeek)} {s.startTime}–
-                                      {s.endTime}
-                                    </div>
-                                  ))}
+                              {subject.schedules.length === 0 ? (
+                                <span style={{ color: "var(--ink-faint)" }}>
+                                  No schedule
+                                </span>
+                              ) : (
+                                subject.schedules.map((s, i) => (
+                                  <div key={i}>
+                                    {getDayName(s.dayOfWeek)} {s.startTime}–
+                                    {s.endTime}
+                                  </div>
+                                ))
+                              )}
                             </td>
                             <td>{st.teacher.name}</td>
                             <td>
@@ -765,11 +793,18 @@ function ManageClasses() {
           </div>
         )}
 
-        {/* ── ENROLLMENTS TAB ── */}
+        {/* ══════════════════════════════════════════════════════
+            ENROLLMENTS TAB
+        ══════════════════════════════════════════════════════ */}
         {activeTab === "enrollments" && (
           <div className="tab-content">
+            {/* Enroll by section */}
             <div className="management-section">
               <p className="section-title">Enroll Students</p>
+              <p className="section-subtitle">
+                Select a subject, then enroll an entire section at once.
+              </p>
+
               <div className="form-group" style={{ maxWidth: "400px" }}>
                 <label className="form-label">Select Subject</label>
                 <select
@@ -816,7 +851,7 @@ function ManageClasses() {
                     }}
                   >
                     Enroll all students from a section at once. Already-enrolled
-                    are skipped.
+                    students are skipped.
                   </p>
                   <div
                     style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}
@@ -864,6 +899,7 @@ function ManageClasses() {
               )}
             </div>
 
+            {/* Current enrollments summary */}
             <div className="management-section">
               <p className="section-title">Current Enrollments</p>
               {subjects.every((s) => s.enrollments.length === 0) ? (
@@ -876,16 +912,29 @@ function ManageClasses() {
                   return (
                     <div key={subject.id} className="enrollment-card">
                       <h3>
-                        {subject.name}{" "}
+                        {subject.name}
                         <span
                           style={{
                             fontFamily: "inherit",
                             fontWeight: 400,
                             fontSize: "12px",
                             color: "var(--ink-faint)",
+                            marginLeft: "6px",
                           }}
                         >
                           ({subject.code})
+                        </span>
+                        <span
+                          style={{
+                            fontFamily: "inherit",
+                            fontWeight: 400,
+                            fontSize: "12px",
+                            color: "var(--ink-muted)",
+                            marginLeft: "8px",
+                          }}
+                        >
+                          — {subject.enrollments.length} student
+                          {subject.enrollments.length !== 1 ? "s" : ""}
                         </span>
                       </h3>
                       <div className="enrolled-students">
@@ -904,7 +953,7 @@ function ManageClasses() {
                               style={{
                                 display: "inline-flex",
                                 alignItems: "center",
-                                gap: "6px",
+                                gap: "5px",
                               }}
                             >
                               {dn}
@@ -920,11 +969,12 @@ function ManageClasses() {
                                   border: "none",
                                   cursor: "pointer",
                                   color: "var(--ink-faint)",
-                                  fontSize: "12px",
+                                  fontSize: "11px",
                                   lineHeight: 1,
                                   padding: "0 2px",
+                                  fontFamily: "inherit",
                                 }}
-                                title="Remove"
+                                title={`Remove ${dn}`}
                               >
                                 ✕
                               </button>
@@ -940,7 +990,9 @@ function ManageClasses() {
           </div>
         )}
 
-        {/* ── EDIT SUBJECT MODAL ── */}
+        {/* ══════════════════════════════════════════════════════
+            EDIT SUBJECT MODAL
+        ══════════════════════════════════════════════════════ */}
         {editingSubjectId && editForm && (
           <>
             <div
@@ -982,6 +1034,7 @@ function ManageClasses() {
                       fontSize: "18px",
                       fontWeight: 700,
                       color: "var(--ink)",
+                      fontFamily: "var(--font-heading)",
                       marginBottom: "4px",
                     }}
                   >
@@ -1012,6 +1065,7 @@ function ManageClasses() {
                   ✕
                 </button>
               </div>
+
               <div className="form-row" style={{ marginBottom: "14px" }}>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">Subject Name</label>
@@ -1040,6 +1094,7 @@ function ManageClasses() {
                   </p>
                 </div>
               </div>
+
               <div className="form-group">
                 <label className="form-label">Description (Optional)</label>
                 <textarea
@@ -1051,6 +1106,7 @@ function ManageClasses() {
                   style={{ resize: "vertical" }}
                 />
               </div>
+
               <div className="form-group">
                 <label className="form-label">Weekly Schedule</label>
                 {editForm.schedules.map((schedule, index) => (
@@ -1116,6 +1172,7 @@ function ManageClasses() {
                   + Add Schedule
                 </button>
               </div>
+
               <div
                 style={{
                   borderTop: "1px solid var(--border)",
