@@ -7,39 +7,26 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 
 function LoginForm() {
   const navigate = useNavigate();
-
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [notRegistered, setNotRegistered] = useState(null); // { email }
+  const [notRegistered, setNotRegistered] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const clearMessages = () => {
-    setError("");
-    setNotRegistered(null);
-  };
-
-  // ── Shared success handler ──
   const handleLoginSuccess = useCallback(
     (data) => {
       localStorage.setItem("token", data.token);
       localStorage.setItem("role", data.role);
       localStorage.setItem("name", data.name);
-      if (data.role === "ADMIN") {
-        navigate("/admin/AdminDashboard");
-      } else if (data.role === "TEACHER") {
-        navigate("/teacher/TeacherDashboard");
-      } else {
-        setError("Unknown role. Contact your administrator.");
-      }
+      if (data.role === "ADMIN") navigate("/admin/AdminDashboard");
+      else if (data.role === "TEACHER") navigate("/teacher/TeacherDashboard");
+      else setError("Unknown role. Contact your administrator.");
     },
     [navigate],
   );
 
-  // ── Google SSO ──
   const handleGoogleSuccess = async (credentialResponse) => {
     setLoading(true);
-    clearMessages();
+    setError("");
+    setNotRegistered(null);
     try {
       const { data } = await api.post("/auth/google", {
         credential: credentialResponse.credential,
@@ -48,83 +35,57 @@ function LoginForm() {
     } catch (err) {
       const status = err.response?.status;
       const resData = err.response?.data;
-
-      if (status === 403) {
-        // Backend confirmed identity but no account exists yet
-        setNotRegistered({ email: resData?.email || "" });
-      } else {
+      if (status === 403) setNotRegistered({ email: resData?.email || "" });
+      else
         setError(
           resData?.message || "Google sign-in failed. Please try again.",
         );
-      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleError = () => {
+  const handleGoogleError = () =>
     setError("Google sign-in was cancelled or failed. Please try again.");
-  };
 
-  // ── Email + password login ──
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!email || !password) {
-      setError("Email and password are required");
-      return;
-    }
-    setLoading(true);
-    clearMessages();
-    try {
-      const { data } = await api.post("/auth/login", { email, password });
-      handleLoginSuccess(data);
-    } catch (err) {
-      setError(
-        err.response?.data?.message || "Login failed. Please try again.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const inputStyle = {
-    width: "100%",
-    padding: "11px 14px",
-    border: "1px solid #e2e8f0",
-    borderRadius: "8px",
-    fontSize: "14px",
-    fontFamily: "inherit",
-    color: "#1a202c",
+  const card = {
     background: "#fff",
-    outline: "none",
-    boxSizing: "border-box",
-    transition: "border 0.15s",
+    borderRadius: "16px",
+    boxShadow: "0 4px 40px rgba(14,165,233,0.15),0 1px 8px rgba(0,0,0,0.08)",
+    padding: "44px 40px",
+    width: "100%",
+    maxWidth: "400px",
+    position: "relative",
+    overflow: "hidden",
   };
+  const font = { fontFamily: "Inter,system-ui,sans-serif" };
 
   return (
-    <div
-      style={{
-        background: "#fff",
-        borderRadius: "16px",
-        boxShadow: "0 4px 32px rgba(0,0,0,0.10)",
-        padding: "40px 36px",
-        width: "100%",
-        maxWidth: "400px",
-      }}
-    >
-      {/* Logo + Title */}
-      <div style={{ textAlign: "center", marginBottom: "28px" }}>
+    <div style={card}>
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: "3px",
+          background: "linear-gradient(90deg,#0ea5e9,#38bdf8,#7dd3fc)",
+        }}
+      />
+
+      <div style={{ textAlign: "center", marginBottom: "32px" }}>
         <div
           style={{
-            width: "56px",
-            height: "56px",
-            borderRadius: "50%",
-            background: "#8B0000",
-            margin: "0 auto 14px",
+            width: "60px",
+            height: "60px",
+            borderRadius: "14px",
+            background: "linear-gradient(135deg,#0284c7,#0ea5e9)",
+            margin: "0 auto 16px",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: "22px",
+            fontSize: "26px",
+            boxShadow: "0 4px 16px rgba(14,165,233,0.35)",
           }}
         >
           🎓
@@ -133,37 +94,40 @@ function LoginForm() {
           style={{
             fontSize: "22px",
             fontWeight: 800,
-            color: "#1a202c",
-            fontFamily: "Georgia, serif",
-            margin: "0 0 4px",
+            color: "#0f172a",
+            letterSpacing: "-0.02em",
+            margin: "0 0 6px",
+            ...font,
           }}
         >
           FaceCloud
         </h1>
-        <p style={{ fontSize: "13px", color: "#64748b", margin: 0 }}>
+        <p
+          style={{
+            fontSize: "12.5px",
+            color: "#64748b",
+            margin: 0,
+            letterSpacing: "0.02em",
+            ...font,
+          }}
+        >
           PUP Computer Engineering · Attendance System
         </p>
       </div>
 
-      {/* ── Not registered banner ── */}
       {notRegistered && (
         <div
           style={{
             background: "#fffbeb",
             border: "1px solid #fcd34d",
-            borderRadius: "8px",
+            borderRadius: "10px",
             padding: "14px 16px",
             marginBottom: "20px",
           }}
         >
           <div
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: "10px",
-            }}
+            style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}
           >
-            {/* Warning icon */}
             <span style={{ fontSize: "18px", lineHeight: 1, flexShrink: 0 }}>
               ⚠️
             </span>
@@ -174,6 +138,7 @@ function LoginForm() {
                   fontWeight: 700,
                   color: "#92400e",
                   margin: "0 0 4px",
+                  ...font,
                 }}
               >
                 No account found
@@ -184,6 +149,7 @@ function LoginForm() {
                   color: "#78350f",
                   margin: 0,
                   lineHeight: 1.5,
+                  ...font,
                 }}
               >
                 {notRegistered.email ? (
@@ -201,183 +167,154 @@ function LoginForm() {
         </div>
       )}
 
-      {/* ── Generic error banner ── */}
       {error && (
         <div
           style={{
             background: "#fef2f2",
             border: "1px solid #fecaca",
-            borderRadius: "8px",
-            padding: "10px 14px",
+            borderRadius: "10px",
+            padding: "11px 14px",
             fontSize: "13px",
             color: "#dc2626",
             marginBottom: "20px",
+            ...font,
           }}
         >
           {error}
         </div>
       )}
 
-      {/* ── Google SSO ── */}
-      {GOOGLE_CLIENT_ID && (
-        <>
-          <div style={{ marginBottom: "4px" }}>
-            <GoogleLogin
-              onSuccess={handleGoogleSuccess}
-              onError={handleGoogleError}
-              useOneTap={false}
-              theme="outline"
-              size="large"
-              width="328"
-              text="signin_with_google"
-              shape="rectangular"
-              logo_alignment="left"
-            />
-          </div>
-
-          {/* Divider */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
-              margin: "20px 0",
-            }}
-          >
-            <div style={{ flex: 1, height: "1px", background: "#e2e8f0" }} />
-            <span
-              style={{
-                fontSize: "12px",
-                color: "#94a3b8",
-                whiteSpace: "nowrap",
-              }}
-            >
-              or sign in with email
-            </span>
-            <div style={{ flex: 1, height: "1px", background: "#e2e8f0" }} />
-          </div>
-        </>
-      )}
-
-      {/* ── Email + Password form ── */}
-      <form
-        onSubmit={handleSubmit}
-        style={{ display: "flex", flexDirection: "column", gap: "14px" }}
-      >
-        <div>
-          <label
-            style={{
-              fontSize: "12px",
-              fontWeight: 600,
-              color: "#374151",
-              display: "block",
-              marginBottom: "5px",
-            }}
-          >
-            Email Address
-          </label>
-          <input
-            type="email"
-            placeholder="faculty@pup.edu.ph"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={inputStyle}
-            onFocus={(e) => (e.target.style.border = "1px solid #8B0000")}
-            onBlur={(e) => (e.target.style.border = "1px solid #e2e8f0")}
-            autoComplete="email"
-          />
-        </div>
-        <div>
-          <label
-            style={{
-              fontSize: "12px",
-              fontWeight: 600,
-              color: "#374151",
-              display: "block",
-              marginBottom: "5px",
-            }}
-          >
-            Password
-          </label>
-          <input
-            type="password"
-            placeholder="Enter your password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={inputStyle}
-            onFocus={(e) => (e.target.style.border = "1px solid #8B0000")}
-            onBlur={(e) => (e.target.style.border = "1px solid #e2e8f0")}
-            autoComplete="current-password"
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={loading}
+      {loading ? (
+        <div
           style={{
-            width: "100%",
-            padding: "12px",
-            background: loading ? "#e2e8f0" : "#8B0000",
-            color: loading ? "#94a3b8" : "#fff",
-            border: "none",
-            borderRadius: "8px",
-            fontSize: "14px",
-            fontWeight: 700,
-            fontFamily: "inherit",
-            cursor: loading ? "not-allowed" : "pointer",
-            transition: "background 0.15s",
+            textAlign: "center",
+            padding: "12px 0 20px",
+            fontSize: "13px",
+            color: "#64748b",
+            ...font,
           }}
         >
-          {loading ? "Signing in…" : "Sign In"}
-        </button>
-      </form>
+          Signing in…
+        </div>
+      ) : (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "12px",
+            alignItems: "center",
+          }}
+        >
+          <p
+            style={{
+              fontSize: "11px",
+              color: "#94a3b8",
+              margin: "0 0 4px",
+              textTransform: "uppercase",
+              letterSpacing: "0.09em",
+              fontWeight: 600,
+              ...font,
+            }}
+          >
+            Sign in with
+          </p>
+          <GoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={handleGoogleError}
+            useOneTap={false}
+            theme="outline"
+            size="large"
+            width="320"
+            text="signin_with_google"
+            shape="rectangular"
+            logo_alignment="center"
+          />
+        </div>
+      )}
 
       <p
         style={{
           textAlign: "center",
           fontSize: "12px",
           color: "#94a3b8",
-          marginTop: "20px",
+          marginTop: "24px",
           marginBottom: 0,
+          lineHeight: 1.6,
+          ...font,
         }}
       >
-        Don't have an account? Contact your administrator.
+        Don&apos;t have an account?
+        <br />
+        Contact your administrator to register.
       </p>
     </div>
   );
 }
 
 function Login() {
+  const bg = {
+    minHeight: "100vh",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "linear-gradient(135deg,#0c4a6e 0%,#0369a1 45%,#0284c7 100%)",
+    padding: "20px",
+    position: "relative",
+    overflow: "hidden",
+  };
+  const grid = {
+    position: "absolute",
+    inset: 0,
+    zIndex: 0,
+    backgroundImage:
+      "linear-gradient(rgba(255,255,255,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.04) 1px,transparent 1px)",
+    backgroundSize: "28px 28px",
+    pointerEvents: "none",
+  };
+
   if (!GOOGLE_CLIENT_ID) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background:
-            "linear-gradient(135deg, #8B0000 0%, #6b0000 50%, #1a0000 100%)",
-          padding: "20px",
-        }}
-      >
-        <LoginForm />
+      <div style={bg}>
+        <div style={grid} />
+        <div
+          style={{
+            position: "relative",
+            zIndex: 1,
+            width: "100%",
+            maxWidth: "400px",
+          }}
+        >
+          <LoginForm />
+          <p
+            style={{
+              textAlign: "center",
+              marginTop: "16px",
+              fontSize: "12px",
+              color: "rgba(186,230,253,0.6)",
+              fontFamily: "Inter,system-ui,sans-serif",
+            }}
+          >
+            VITE_GOOGLE_CLIENT_ID not set — check your environment variables.
+          </p>
+        </div>
       </div>
     );
   }
+
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background:
-            "linear-gradient(135deg, #8B0000 0%, #6b0000 50%, #1a0000 100%)",
-          padding: "20px",
-        }}
-      >
-        <LoginForm />
+      <div style={bg}>
+        <div style={grid} />
+        <div
+          style={{
+            position: "relative",
+            zIndex: 1,
+            width: "100%",
+            maxWidth: "400px",
+          }}
+        >
+          <LoginForm />
+        </div>
       </div>
     </GoogleOAuthProvider>
   );

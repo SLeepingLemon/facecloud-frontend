@@ -1,3 +1,7 @@
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import api from "../../services/api";
+
 function formatDisplayName(surname, firstName, middleInitial) {
   if (!surname || !firstName) return "Unknown";
   const mi = middleInitial ? ` ${middleInitial.trim().toUpperCase()}.` : "";
@@ -30,10 +34,6 @@ function formatSchedules(schedules) {
     )
     .join(" | ");
 }
-
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import api from "../../services/api";
 
 function Reports() {
   const navigate = useNavigate();
@@ -72,7 +72,24 @@ function Reports() {
     api
       .get("/subjects")
       .then((res) => setSubjects(res.data))
-      .catch(() => setError("Failed to load subjects"));
+      .catch((err) => {
+        const status = err.response?.status;
+        if (status === 401) {
+          // Token expired — force re-login
+          localStorage.removeItem("token");
+          localStorage.removeItem("role");
+          localStorage.removeItem("name");
+          navigate("/");
+          return;
+        }
+        setError(
+          status === 500
+            ? "Server error loading subjects. Check Render logs."
+            : !err.response
+              ? "Cannot reach server. Render may be waking up — please wait 30 seconds and refresh."
+              : `Failed to load subjects (${status})`,
+        );
+      });
   };
 
   const handleLogout = () => {
@@ -98,8 +115,20 @@ function Reports() {
         setReportData(res.data);
         setLoading(false);
       })
-      .catch(() => {
-        setError("Failed to generate report");
+      .catch((err) => {
+        const status = err.response?.status;
+        if (status === 401) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("role");
+          localStorage.removeItem("name");
+          navigate("/");
+          return;
+        }
+        setError(
+          !err.response
+            ? "Cannot reach server. Render may be waking up — please wait 30 seconds and refresh."
+            : `Failed to generate report (${status || "unknown error"})`,
+        );
         setLoading(false);
       });
   };
@@ -504,7 +533,7 @@ function Reports() {
                           borderRadius: "6px",
                           cursor: "pointer",
                           fontSize: "13px",
-                          color: "var(--pup-red)",
+                          color: "var(--sky-dark)",
                           fontWeight: 600,
                           fontFamily: "inherit",
                           flexShrink: 0,
@@ -514,7 +543,7 @@ function Reports() {
                           e.currentTarget.style.background =
                             "var(--pup-red-ghost)";
                           e.currentTarget.style.borderColor =
-                            "var(--pup-red-light)";
+                            "rgba(14,165,233,0.3)";
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.background = "#fff";

@@ -264,7 +264,7 @@ function ManageUsers() {
     border: "1px solid var(--border)",
     borderRadius: "6px",
     cursor: "pointer",
-    color: "var(--pup-red)",
+    color: "var(--sky-dark)",
     marginLeft: "6px",
     transition: "all 0.15s",
   };

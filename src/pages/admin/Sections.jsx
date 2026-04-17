@@ -114,8 +114,7 @@ function Sections() {
       ? allPillSections
       : allPillSections.filter((s) => s === activeSection);
 
-  const goToImport = () =>
-    navigate("/admin/manage-classes", { state: { tab: "students" } });
+  const goToImport = () => navigate("/admin/manage-classes", {});
 
   const inputStyle = {
     flex: 1,
@@ -234,7 +233,7 @@ function Sections() {
               alignItems: "center",
               gap: "8px",
               padding: "10px 18px",
-              background: "var(--pup-red)",
+              background: "var(--sky)",
               color: "#fff",
               border: "none",
               borderRadius: "var(--radius-md)",
@@ -307,7 +306,7 @@ function Sections() {
                 background:
                   addingSection || !newSection.trim()
                     ? "var(--border)"
-                    : "var(--pup-red)",
+                    : "var(--sky)",
                 color:
                   addingSection || !newSection.trim()
                     ? "var(--ink-muted)"
@@ -356,7 +355,7 @@ function Sections() {
                   <button
                     onClick={goToImport}
                     style={{
-                      color: "var(--pup-red)",
+                      color: "var(--sky)",
                       background: "none",
                       border: "none",
                       cursor: "pointer",
@@ -398,9 +397,7 @@ function Sections() {
                           ? "none"
                           : "1px solid var(--border)",
                       background:
-                        activeSection === "all"
-                          ? "var(--pup-red)"
-                          : "var(--white)",
+                        activeSection === "all" ? "var(--sky)" : "var(--white)",
                       color:
                         activeSection === "all" ? "#fff" : "var(--ink-muted)",
                       fontSize: "13px",
@@ -434,9 +431,9 @@ function Sections() {
                           cursor: isEmpty ? "default" : "pointer",
                           border: isActive ? "none" : "1px solid var(--border)",
                           background: isActive
-                            ? "var(--pup-red)"
+                            ? "var(--sky)"
                             : isEmpty
-                              ? "var(--pup-red-ghost)"
+                              ? "var(--sky-5)"
                               : "var(--white)",
                           color: isActive
                             ? "#fff"
@@ -490,8 +487,8 @@ function Sections() {
                             alignItems: "center",
                             justifyContent: "space-between",
                             padding: "16px 24px",
-                            background: "var(--pup-red-ghost)",
-                            borderBottom: "1px solid var(--pup-red-light)",
+                            background: "var(--sky-5)",
+                            borderBottom: "1px solid rgba(14,165,233,0.25)",
                           }}
                         >
                           <div
@@ -505,7 +502,7 @@ function Sections() {
                               style={{
                                 fontSize: "17px",
                                 fontWeight: 700,
-                                color: "var(--pup-red)",
+                                color: "var(--sky)",
                                 fontFamily: "var(--font-heading)",
                               }}
                             >

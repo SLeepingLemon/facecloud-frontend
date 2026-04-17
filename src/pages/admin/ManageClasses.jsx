@@ -825,7 +825,7 @@ function ManageClasses() {
                 <div
                   style={{
                     background: "var(--pup-red-ghost)",
-                    border: "1px solid var(--pup-red-light)",
+                    border: "1px solid rgba(14,165,233,0.3)",
                     borderRadius: "var(--radius)",
                     padding: "16px 20px",
                     marginBottom: "24px",

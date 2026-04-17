@@ -68,7 +68,7 @@ function StatusBadge({ status }) {
     PENDING: { bg: "#f1f5f9", color: "#64748b" }, // gray — waiting
     PRESENT: { bg: "#dcfce7", color: "#166534" }, // green
     LATE: { bg: "#fef9c3", color: "#854d0e" }, // yellow
-    ABSENT: { bg: "#fee2e2", color: "#991b1b" }, // red
+    ABSENT: { bg: "var(--sky-4)", color: "var(--sky-dark)" }, // red
   };
   const c = colors[status] || colors.PENDING;
   return (
@@ -699,8 +699,8 @@ function TeacherDashboard() {
                   onClick={() => handleSubjectClick(subject)}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.boxShadow =
-                      "0 4px 16px rgba(192,32,42,0.12)";
-                    e.currentTarget.style.borderColor = "var(--pup-red-light)";
+                      "0 4px 16px rgba(14,165,233,0.12)";
+                    e.currentTarget.style.borderColor = "rgba(14,165,233,0.3)";
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.boxShadow = "";
@@ -731,8 +731,8 @@ function TeacherDashboard() {
                             gap: "4px",
                             padding: "2px 8px",
                             borderRadius: "20px",
-                            background: "#fee2e2",
-                            color: "#991b1b",
+                            background: "var(--sky-4)",
+                            color: "var(--sky-dark)",
                             fontSize: "11px",
                             fontWeight: 700,
                             animation: "pulse 1.5s infinite",
@@ -786,7 +786,7 @@ function TeacherDashboard() {
                       style={{
                         fontSize: "13px",
                         fontWeight: 600,
-                        color: "var(--pup-red)",
+                        color: "var(--sky-dark)",
                       }}
                     >
                       View Attendance →
@@ -904,7 +904,7 @@ function TeacherDashboard() {
                           ? { bg: "#dcfce7", color: "#166534" }
                           : rate >= 75
                             ? { bg: "#fef9c3", color: "#854d0e" }
-                            : { bg: "#fee2e2", color: "#991b1b" };
+                            : { bg: "var(--sky-4)", color: "var(--sky-dark)" };
                       return (
                         <tr key={row.student.id}>
                           <td
@@ -1085,7 +1085,7 @@ function TeacherDashboard() {
                         borderRadius: "6px",
                         cursor: "pointer",
                         fontSize: "13px",
-                        color: "var(--pup-red)",
+                        color: "var(--sky-dark)",
                         fontWeight: 600,
                         fontFamily: "inherit",
                         flexShrink: 0,
@@ -1095,7 +1095,7 @@ function TeacherDashboard() {
                         e.currentTarget.style.background =
                           "var(--pup-red-ghost)";
                         e.currentTarget.style.borderColor =
-                          "var(--pup-red-light)";
+                          "rgba(14,165,233,0.3)";
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.background = "var(--white)";
@@ -1186,8 +1186,8 @@ function TeacherDashboard() {
                       alignItems: "center",
                       gap: "5px",
                       padding: "3px 10px",
-                      background: "#fee2e2",
-                      color: "#991b1b",
+                      background: "var(--sky-4)",
+                      color: "var(--sky-dark)",
                       borderRadius: "20px",
                       fontSize: "11px",
                       fontWeight: 700,
