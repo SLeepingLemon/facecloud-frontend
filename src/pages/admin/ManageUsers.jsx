@@ -10,6 +10,18 @@ function buildFacultyName(title, firstName, middleInitial, lastName) {
   return `${title} ${firstName.trim()}${mi} ${lastName.trim()}`;
 }
 
+// Parse a formatted name back into parts for the edit form
+// e.g. "Engr. Juan R. Dela Cruz" → { title: "Engr.", name: "Juan R. Dela Cruz" }
+function splitTitle(fullName) {
+  if (!fullName) return { title: "", name: "" };
+  for (const t of VALID_TITLES) {
+    if (fullName.startsWith(t + " ")) {
+      return { title: t, name: fullName.slice(t.length + 1).trim() };
+    }
+  }
+  return { title: "", name: fullName };
+}
+
 function ManageUsers() {
   const navigate = useNavigate();
   const userName = localStorage.getItem("name") || "Admin";
@@ -19,6 +31,15 @@ function ManageUsers() {
     .join("")
     .toUpperCase()
     .slice(0, 2);
+  const currentUserId = (() => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return null;
+      return JSON.parse(atob(token.split(".")[1])).userId;
+    } catch {
+      return null;
+    }
+  })();
 
   const [formData, setFormData] = useState({
     title: "",
@@ -34,6 +55,12 @@ function ManageUsers() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  // ── Edit modal state ──
+  const [editUser, setEditUser] = useState(null); // user object being edited
+  const [editForm, setEditForm] = useState({ name: "", email: "" });
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState("");
 
   useEffect(() => {
     fetchUsers();
@@ -110,12 +137,78 @@ function ManageUsers() {
         setLoading(false);
       })
       .catch((err) => {
-        setError(
-          err.response?.data?.message ||
-            "Registration failed. Please try again.",
-        );
+        setError(err.response?.data?.message || "Registration failed.");
         setLoading(false);
       });
+  };
+
+  // ── Open edit modal ──
+  const openEdit = (user) => {
+    setEditUser(user);
+    setEditForm({ name: user.name || "", email: user.email || "" });
+    setEditError("");
+  };
+
+  const closeEdit = () => {
+    setEditUser(null);
+    setEditError("");
+  };
+
+  const handleEditSave = () => {
+    if (!editForm.name.trim()) {
+      setEditError("Name cannot be empty.");
+      return;
+    }
+    if (!editForm.email.trim()) {
+      setEditError("Email cannot be empty.");
+      return;
+    }
+    setEditLoading(true);
+    setEditError("");
+    api
+      .put(`/auth/users/${editUser.id}`, {
+        name: editForm.name.trim(),
+        email: editForm.email.trim(),
+      })
+      .then((res) => {
+        setSuccess(`✅ Account updated for ${res.data.user.name}.`);
+        // If the admin edited their own account, update localStorage name
+        if (editUser.id === currentUserId) {
+          localStorage.setItem("name", res.data.user.name);
+        }
+        fetchUsers();
+        closeEdit();
+        setEditLoading(false);
+      })
+      .catch((err) => {
+        setEditError(err.response?.data?.message || "Update failed.");
+        setEditLoading(false);
+      });
+  };
+
+  // ── Delete user ──
+  const handleDelete = (user) => {
+    if (user.id === currentUserId) {
+      setError("You cannot delete your own account.");
+      return;
+    }
+    if (
+      !window.confirm(
+        `Delete account for ${user.name}?\n\nThis will also remove them from any subject assignments. This cannot be undone.`,
+      )
+    )
+      return;
+    setError("");
+    setSuccess("");
+    api
+      .delete(`/auth/users/${user.id}`)
+      .then((res) => {
+        setSuccess(`✅ ${res.data.message}`);
+        fetchUsers();
+      })
+      .catch((err) =>
+        setError(err.response?.data?.message || "Failed to delete user."),
+      );
   };
 
   const teachers = users.filter((u) => u.role === "TEACHER");
@@ -126,14 +219,14 @@ function ManageUsers() {
     padding: col,
     fontWeight: 500,
     verticalAlign: "middle",
-    width: "34%",
+    width: "30%",
   };
   const tdEmail = {
     padding: col,
     color: "var(--ink-muted)",
     fontSize: "13px",
     verticalAlign: "middle",
-    width: "50%",
+    width: "36%",
   };
   const tdDate = {
     padding: col,
@@ -141,7 +234,13 @@ function ManageUsers() {
     fontSize: "12px",
     verticalAlign: "middle",
     whiteSpace: "nowrap",
-    width: "16%",
+    width: "14%",
+    textAlign: "right",
+  };
+  const tdAct = {
+    padding: col,
+    verticalAlign: "middle",
+    width: "20%",
     textAlign: "right",
   };
   const thStyle = {
@@ -154,7 +253,115 @@ function ManageUsers() {
     borderBottom: "1px solid var(--border)",
     textAlign: "left",
   };
-  const thDate = { ...thStyle, textAlign: "right" };
+  const thRight = { ...thStyle, textAlign: "right" };
+
+  const btnEdit = {
+    padding: "4px 12px",
+    fontSize: "12px",
+    fontWeight: 600,
+    fontFamily: "inherit",
+    background: "var(--white)",
+    border: "1px solid var(--border)",
+    borderRadius: "6px",
+    cursor: "pointer",
+    color: "var(--pup-red)",
+    marginLeft: "6px",
+    transition: "all 0.15s",
+  };
+  const btnDel = {
+    ...btnEdit,
+    color: "#dc2626",
+    borderColor: "#fecaca",
+  };
+
+  const UserTable = ({ list, label, icon }) => (
+    <div style={{ marginBottom: "28px" }}>
+      <p
+        style={{
+          fontSize: "11px",
+          fontWeight: 700,
+          textTransform: "uppercase",
+          letterSpacing: "0.06em",
+          color: "var(--ink-muted)",
+          marginBottom: "10px",
+        }}
+      >
+        {icon} {label} ({list.length})
+      </p>
+      {list.length === 0 ? (
+        <p
+          style={{
+            fontSize: "13px",
+            color: "var(--ink-faint)",
+            fontStyle: "italic",
+          }}
+        >
+          No accounts yet.
+        </p>
+      ) : (
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            tableLayout: "fixed",
+          }}
+        >
+          <thead>
+            <tr>
+              <th style={thStyle}>Name</th>
+              <th style={thStyle}>Email</th>
+              <th style={{ ...thStyle, ...thRight }}>Created</th>
+              <th style={{ ...thStyle, ...thRight }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.map((u) => (
+              <tr key={u.id}>
+                <td style={tdName}>{u.name}</td>
+                <td style={tdEmail}>{u.email}</td>
+                <td style={tdDate}>
+                  {new Date(u.createdAt).toLocaleDateString("en-PH", {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </td>
+                <td style={tdAct}>
+                  <button
+                    style={btnEdit}
+                    onClick={() => openEdit(u)}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.background =
+                        "var(--pup-red-ghost)")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.background = "var(--white)")
+                    }
+                  >
+                    ✏️ Edit
+                  </button>
+                  {u.id !== currentUserId && (
+                    <button
+                      style={btnDel}
+                      onClick={() => handleDelete(u)}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "#fef2f2";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "var(--white)";
+                      }}
+                    >
+                      🗑 Delete
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
 
   return (
     <div className="dashboard">
@@ -219,9 +426,20 @@ function ManageUsers() {
         <div className="page-header">
           <h1 className="page-title">Manage Users</h1>
           <p className="page-subtitle">
-            Create and manage faculty and administrator accounts.
+            Create, edit, and manage faculty and administrator accounts.
           </p>
         </div>
+
+        {error && (
+          <div className="alert alert-error" style={{ marginBottom: "16px" }}>
+            {error}
+          </div>
+        )}
+        {success && (
+          <div className="alert alert-success" style={{ marginBottom: "16px" }}>
+            {success}
+          </div>
+        )}
 
         {/* ── CREATE FORM ── */}
         <div className="user-management-card">
@@ -238,22 +456,7 @@ function ManageUsers() {
             </p>
           </div>
 
-          {error && (
-            <div className="alert alert-error" style={{ marginBottom: "16px" }}>
-              {error}
-            </div>
-          )}
-          {success && (
-            <div
-              className="alert alert-success"
-              style={{ marginBottom: "16px" }}
-            >
-              {success}
-            </div>
-          )}
-
           <form onSubmit={handleSubmit} className="user-form">
-            {/* Row 1 — Title + Last Name */}
             <div
               className="form-row"
               style={{ gridTemplateColumns: "140px 1fr", alignItems: "end" }}
@@ -291,7 +494,6 @@ function ManageUsers() {
               </div>
             </div>
 
-            {/* Row 2 — First Name + M.I. + Role */}
             <div
               className="form-row"
               style={{
@@ -353,7 +555,6 @@ function ManageUsers() {
               </div>
             </div>
 
-            {/* Name preview */}
             {previewName && (
               <div
                 style={{
@@ -390,7 +591,6 @@ function ManageUsers() {
               </div>
             )}
 
-            {/* Row 3 — Email */}
             <div className="form-group">
               <label className="form-label">Email Address</label>
               <input
@@ -405,7 +605,6 @@ function ManageUsers() {
               />
             </div>
 
-            {/* Row 4 — Passwords */}
             <div
               className="form-row"
               style={{ gridTemplateColumns: "1fr 1fr", alignItems: "end" }}
@@ -457,124 +656,155 @@ function ManageUsers() {
           <p className="section-title" style={{ marginBottom: "20px" }}>
             All Users
           </p>
-
-          {/* Faculty */}
-          <div style={{ marginBottom: "28px" }}>
-            <p
-              style={{
-                fontSize: "11px",
-                fontWeight: 700,
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-                color: "var(--ink-muted)",
-                marginBottom: "10px",
-              }}
-            >
-              👨‍🏫 Faculty ({teachers.length})
-            </p>
-            {teachers.length === 0 ? (
-              <p
-                style={{
-                  fontSize: "13px",
-                  color: "var(--ink-faint)",
-                  fontStyle: "italic",
-                }}
-              >
-                No faculty accounts yet.
-              </p>
-            ) : (
-              <table
-                style={{
-                  width: "100%",
-                  borderCollapse: "collapse",
-                  tableLayout: "fixed",
-                }}
-              >
-                <thead>
-                  <tr>
-                    <th style={thStyle}>Name</th>
-                    <th style={thStyle}>Email</th>
-                    <th style={thDate}>Created</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {teachers.map((u) => (
-                    <tr key={u.id}>
-                      <td style={tdName}>{u.name}</td>
-                      <td style={tdEmail}>{u.email}</td>
-                      <td style={tdDate}>
-                        {new Date(u.createdAt).toLocaleDateString("en-PH", {
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-
-          {/* Admins */}
-          <div>
-            <p
-              style={{
-                fontSize: "11px",
-                fontWeight: 700,
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-                color: "var(--ink-muted)",
-                marginBottom: "10px",
-              }}
-            >
-              🔐 Administrators ({admins.length})
-            </p>
-            {admins.length === 0 ? (
-              <p
-                style={{
-                  fontSize: "13px",
-                  color: "var(--ink-faint)",
-                  fontStyle: "italic",
-                }}
-              >
-                No administrator accounts yet.
-              </p>
-            ) : (
-              <table
-                style={{
-                  width: "100%",
-                  borderCollapse: "collapse",
-                  tableLayout: "fixed",
-                }}
-              >
-                <thead>
-                  <tr>
-                    <th style={thStyle}>Name</th>
-                    <th style={thStyle}>Email</th>
-                    <th style={thDate}>Created</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {admins.map((u) => (
-                    <tr key={u.id}>
-                      <td style={tdName}>{u.name}</td>
-                      <td style={tdEmail}>{u.email}</td>
-                      <td style={tdDate}>
-                        {new Date(u.createdAt).toLocaleDateString("en-PH", {
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+          <UserTable list={teachers} label="Faculty" icon="👨‍🏫" />
+          <UserTable list={admins} label="Administrators" icon="🔐" />
         </div>
       </main>
+
+      {/* ── EDIT MODAL ── */}
+      {editUser && (
+        <>
+          <div
+            onClick={closeEdit}
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.45)",
+              zIndex: 1000,
+            }}
+          />
+          <div
+            style={{
+              position: "fixed",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%,-50%)",
+              zIndex: 1001,
+              width: "min(480px,94vw)",
+              background: "var(--white)",
+              borderRadius: "var(--radius-lg)",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.22)",
+              padding: "32px 36px",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                marginBottom: "24px",
+              }}
+            >
+              <div>
+                <p
+                  style={{
+                    fontSize: "18px",
+                    fontWeight: 700,
+                    color: "var(--ink)",
+                    fontFamily: "var(--font-heading)",
+                    marginBottom: "4px",
+                  }}
+                >
+                  Edit Account
+                </p>
+                <p
+                  style={{
+                    fontSize: "13px",
+                    color: "var(--ink-muted)",
+                    margin: 0,
+                  }}
+                >
+                  {editUser.role === "TEACHER" ? "Faculty" : "Administrator"} ·{" "}
+                  {editUser.email}
+                </p>
+              </div>
+              <button
+                onClick={closeEdit}
+                style={{
+                  width: "32px",
+                  height: "32px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "none",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-sm)",
+                  cursor: "pointer",
+                  fontSize: "16px",
+                  color: "var(--ink-muted)",
+                  flexShrink: 0,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {editError && (
+              <div
+                className="alert alert-error"
+                style={{ marginBottom: "16px" }}
+              >
+                {editError}
+              </div>
+            )}
+
+            <div className="form-group">
+              <label className="form-label">Full Name</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g. Engr. Juan R. Dela Cruz"
+                value={editForm.name}
+                onChange={(e) =>
+                  setEditForm((p) => ({ ...p, name: e.target.value }))
+                }
+                disabled={editLoading}
+                autoFocus
+              />
+              <p className="form-help">
+                Include title — e.g. Engr. Juan R. Dela Cruz
+              </p>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Email Address</label>
+              <input
+                type="email"
+                className="form-input"
+                placeholder="e.g. juan@gmail.com"
+                value={editForm.email}
+                onChange={(e) =>
+                  setEditForm((p) => ({ ...p, email: e.target.value }))
+                }
+                disabled={editLoading}
+              />
+              <p className="form-help">
+                This is the email used to log in. If using Google SSO, it must
+                match their Google account.
+              </p>
+            </div>
+
+            <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
+              <button
+                onClick={handleEditSave}
+                disabled={editLoading}
+                className="btn btn-primary"
+                style={{ flex: 1 }}
+              >
+                {editLoading ? "Saving…" : "Save Changes"}
+              </button>
+              <button
+                onClick={closeEdit}
+                disabled={editLoading}
+                className="btn-secondary"
+                style={{ flex: 1 }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

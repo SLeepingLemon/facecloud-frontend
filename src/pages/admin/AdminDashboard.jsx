@@ -162,11 +162,6 @@ function AdminDashboard() {
             <h3 className="card-title">View Reports</h3>
             <p>Access attendance reports and analytics</p>
           </div>
-          <div className="card-item card-disabled">
-            <div className="card-icon">⚙️</div>
-            <h3 className="card-title">Settings</h3>
-            <p>Configure system settings (Coming soon)</p>
-          </div>
         </div>
       </main>
     </div>
