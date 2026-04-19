@@ -309,7 +309,7 @@ function TeacherDashboard({ dark, toggleDark }) {
           </main>
         </div>
       </div>
-    );
+  );
   }
 
   // ══════════════════════════════════════════════════════════════
@@ -413,7 +413,7 @@ function TeacherDashboard({ dark, toggleDark }) {
           </main>
         </div>
       </div>
-    );
+  );
   }
 
   // ══════════════════════════════════════════════════════════════

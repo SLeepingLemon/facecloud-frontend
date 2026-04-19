@@ -1,142 +1,214 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import api from "../../services/api";
 import Sidebar from "../../components/Sidebar";
 
-const VALID_TITLES = ["Engr.", "Dr.", "Prof.", "Mr.", "Ms.", "Mrs."];
+const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const DAY_SHORT = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
-function buildFacultyName(title, firstName, middleInitial, lastName) {
-  if (!title || !firstName || !lastName) return "";
-  const mi = middleInitial ? ` ${middleInitial.trim().toUpperCase()}.` : "";
-  return `${title} ${firstName.trim()}${mi} ${lastName.trim()}`;
+function fmtTime(t) {
+  if (!t) return "";
+  const [h, m] = t.split(":").map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2,"0")} ${h >= 12 ? "PM" : "AM"}`;
 }
 
-function ManageUsers({ dark, toggleDark }) {
+function formatDisplayName(surname, firstName, middleInitial) {
+  if (!surname || !firstName) return "";
+  const mi = middleInitial ? ` ${middleInitial.trim().toUpperCase()}.` : "";
+  return `${surname.trim().toUpperCase()}, ${firstName.trim()}${mi}`;
+}
+
+function ManageClasses({ dark, toggleDark }) {
   const navigate = useNavigate();
-  const userName = localStorage.getItem("name") || "Admin";
+  const location = useLocation();
 
-  const currentUserId = (() => {
-    try {
-      const token = localStorage.getItem("token");
-      if (!token) return null;
-      return JSON.parse(atob(token.split(".")[1])).userId;
-    } catch { return null; }
-  })();
+  // Read tab from URL query param
+  const params   = new URLSearchParams(location.search);
+  const tabParam = params.get("tab");
+  const initTab  = tabParam === "teachers" ? "teachers" : tabParam === "enroll" ? "enrollments" : "subjects";
 
-  const [formData, setFormData] = useState({
-    title: "", firstName: "", middleInitial: "", lastName: "",
-    email: "", password: "", confirmPassword: "", role: "TEACHER",
+  const [activeTab, setActiveTab] = useState(initTab);
+  useEffect(() => { setActiveTab(initTab); }, [tabParam]);
+
+  const [sections,  setSections]  = useState([]);
+  const [subjects,  setSubjects]  = useState([]);
+  const [teachers,  setTeachers]  = useState([]);
+
+  const [subjectForm, setSubjectForm] = useState({
+    name: "", code: "", description: "",
+    schedules: [{ dayOfWeek: 1, startTime: "08:00", endTime: "09:00" }],
   });
-  const [users,        setUsers]        = useState([]);
-  const [loading,      setLoading]      = useState(false);
-  const [error,        setError]        = useState("");
-  const [success,      setSuccess]      = useState("");
-  const [showModal,    setShowModal]    = useState(false);
-  const [editUser,     setEditUser]     = useState(null);
-  const [editForm,     setEditForm]     = useState({ name: "", email: "" });
-  const [editLoading,  setEditLoading]  = useState(false);
-  const [editError,    setEditError]    = useState("");
+  const [showAddModal,     setShowAddModal]     = useState(false);
+  const [editingSubjectId, setEditingSubjectId] = useState(null);
+  const [editForm,         setEditForm]         = useState(null);
+  const [deletingId,       setDeletingId]       = useState(null);
+  const [savingId,         setSavingId]         = useState(null);
 
-  useEffect(() => { fetchUsers(); }, []);
+  // Teachers tab
+  const [selectedSubjectForTeacher, setSelectedSubjectForTeacher] = useState("");
+  const [selectedTeacher,           setSelectedTeacher]           = useState("");
 
-  const fetchUsers = () => {
-    api.get("/auth/users").then(r => setUsers(r.data)).catch(() => {});
+  // Enrollments tab
+  const [selectedSubject,    setSelectedSubject]    = useState("");
+  const [enrollingSectionId, setEnrollingSectionId] = useState(null);
+
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState("");
+  const [success, setSuccess] = useState("");
+
+  useEffect(() => { fetchData(); }, []);
+
+  const fetchData     = () => { fetchSubjects(); fetchTeachers(); api.get("/sections").then(r => setSections(r.data)).catch(() => {}); };
+  const fetchSubjects = () => { api.get("/subjects").then(r => setSubjects(r.data)).catch(() => {}); };
+  const fetchTeachers = () => { api.get("/auth/users").then(r => setTeachers(r.data.filter(u => u.role === "TEACHER"))).catch(() => setTeachers([])); };
+
+  const handleLogout = () => { localStorage.removeItem("token"); localStorage.removeItem("role"); localStorage.removeItem("name"); navigate("/"); };
+
+  // ── Subject form helpers ────────────────────────────────────────
+  const resetForm = () => setSubjectForm({ name: "", code: "", description: "", schedules: [{ dayOfWeek: 1, startTime: "08:00", endTime: "09:00" }] });
+  const handleSubjectChange  = e => { const { name, value } = e.target; setSubjectForm(p => ({ ...p, [name]: value })); };
+  const handleScheduleChange = (i, field, val) => setSubjectForm(p => ({ ...p, schedules: p.schedules.map((s, idx) => idx !== i ? s : { ...s, [field]: field === "dayOfWeek" ? parseInt(val) : val }) }));
+  const addSchedule          = () => setSubjectForm(p => ({ ...p, schedules: [...p.schedules, { dayOfWeek: 1, startTime: "08:00", endTime: "09:00" }] }));
+  const removeSchedule       = i => setSubjectForm(p => ({ ...p, schedules: p.schedules.filter((_, idx) => idx !== i) }));
+
+  const handleSubjectSubmit = e => {
+    e.preventDefault(); setLoading(true); setError(""); setSuccess("");
+    api.post("/subjects", subjectForm)
+      .then(() => { setSuccess("Subject created!"); resetForm(); setShowAddModal(false); fetchSubjects(); setLoading(false); })
+      .catch(err => { setError(err.response?.data?.message || "Failed."); setLoading(false); });
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("token"); localStorage.removeItem("role"); localStorage.removeItem("name");
-    navigate("/");
-  };
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(p => ({ ...p, [name]: value }));
-  };
-
-  const previewName = buildFacultyName(formData.title, formData.firstName, formData.middleInitial, formData.lastName);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  // ── Edit helpers ────────────────────────────────────────────────
+  const handleStartEdit = subject => {
+    setEditingSubjectId(subject.id);
+    setEditForm({ name: subject.name, code: subject.code, description: subject.description || "", schedules: subject.schedules.length > 0 ? subject.schedules.map(s => ({ dayOfWeek: s.dayOfWeek, startTime: s.startTime, endTime: s.endTime })) : [{ dayOfWeek: 1, startTime: "08:00", endTime: "09:00" }] });
     setError(""); setSuccess("");
-    if (formData.password !== formData.confirmPassword) { setError("Passwords do not match."); return; }
-    if (formData.password.length < 6) { setError("Password must be at least 6 characters."); return; }
-    if (!formData.title) { setError("Please select a title."); return; }
-    setLoading(true);
-    api.post("/auth/register-admin", {
-      title: formData.title, firstName: formData.firstName.trim(),
-      middleInitial: formData.middleInitial.trim(), lastName: formData.lastName.trim(),
-      email: formData.email.trim(), password: formData.password, role: formData.role,
-    })
-      .then(res => {
-        const roleName = formData.role === "TEACHER" ? "Faculty" : "Administrator";
-        setSuccess(`✅ ${roleName} account created for ${res.data.name}.`);
-        setFormData({ title: "", firstName: "", middleInitial: "", lastName: "", email: "", password: "", confirmPassword: "", role: "TEACHER" });
-        setShowModal(false); fetchUsers(); setLoading(false);
-      })
-      .catch(err => { setError(err.response?.data?.message || "Registration failed."); setLoading(false); });
+  };
+  const handleCancelEdit         = () => { setEditingSubjectId(null); setEditForm(null); };
+  const handleEditChange         = e => { const { name, value } = e.target; setEditForm(p => ({ ...p, [name]: value })); };
+  const handleEditScheduleChange = (i, field, val) => setEditForm(p => ({ ...p, schedules: p.schedules.map((s, idx) => idx !== i ? s : { ...s, [field]: field === "dayOfWeek" ? parseInt(val) : val }) }));
+  const addEditSchedule          = () => setEditForm(p => ({ ...p, schedules: [...p.schedules, { dayOfWeek: 1, startTime: "08:00", endTime: "09:00" }] }));
+  const removeEditSchedule       = i => setEditForm(p => ({ ...p, schedules: p.schedules.filter((_, idx) => idx !== i) }));
+
+  const handleSaveEdit = subjectId => {
+    if (!editForm.name.trim() || !editForm.code.trim()) { setError("Name and code required."); return; }
+    if (editForm.schedules.length === 0) { setError("At least one schedule required."); return; }
+    setSavingId(subjectId); setError(""); setSuccess("");
+    api.put(`/subjects/${subjectId}`, { name: editForm.name.trim(), code: editForm.code.trim(), description: editForm.description.trim(), schedules: editForm.schedules })
+      .then(res => { setSubjects(p => p.map(s => s.id === subjectId ? res.data.subject : s)); setSuccess(`"${res.data.subject.name}" updated.`); handleCancelEdit(); setSavingId(null); })
+      .catch(err => { setSavingId(null); setError(err.response?.data?.message || "Failed."); });
   };
 
-  const openEdit = (user) => { setEditUser(user); setEditForm({ name: user.name || "", email: user.email || "" }); setEditError(""); };
-  const closeEdit = () => { setEditUser(null); setEditError(""); };
-
-  const handleEditSave = () => {
-    if (!editForm.name.trim())  { setEditError("Name cannot be empty."); return; }
-    if (!editForm.email.trim()) { setEditError("Email cannot be empty."); return; }
-    setEditLoading(true); setEditError("");
-    api.put(`/auth/users/${editUser.id}`, { name: editForm.name.trim(), email: editForm.email.trim() })
-      .then(res => {
-        setSuccess(`✅ Account updated for ${res.data.user.name}.`);
-        if (editUser.id === currentUserId) localStorage.setItem("name", res.data.user.name);
-        fetchUsers(); closeEdit(); setEditLoading(false);
-      })
-      .catch(err => { setEditError(err.response?.data?.message || "Update failed."); setEditLoading(false); });
+  const handleDeleteSubject = (e, subjectId, subjectName) => {
+    e.stopPropagation(); e.preventDefault();
+    if (!window.confirm(`Delete "${subjectName}"?\n\nThis removes all enrollments, teacher assignments, and attendance records. This cannot be undone.`)) return;
+    setDeletingId(subjectId); setError(""); setSuccess("");
+    api.delete(`/subjects/${subjectId}`)
+      .then(() => { setSubjects(p => p.filter(s => s.id !== subjectId)); setSuccess(`"${subjectName}" deleted.`); if (selectedSubject === String(subjectId)) setSelectedSubject(""); if (selectedSubjectForTeacher === String(subjectId)) setSelectedSubjectForTeacher(""); if (editingSubjectId === subjectId) handleCancelEdit(); setDeletingId(null); })
+      .catch(err => { setDeletingId(null); setError(err.response ? `Delete failed: ${err.response.data?.message || "Unknown"}` : "No response from server."); });
   };
 
-  const handleDelete = (user) => {
-    if (user.id === currentUserId) { setError("You cannot delete your own account."); return; }
-    if (!window.confirm(`Delete account for ${user.name}?\n\nThis cannot be undone.`)) return;
+  // ── Teachers ────────────────────────────────────────────────────
+  const handleAssignTeacher = () => {
+    if (!selectedSubjectForTeacher || !selectedTeacher) { setError("Select both a subject and a teacher."); return; }
     setError(""); setSuccess("");
-    api.delete(`/auth/users/${user.id}`)
-      .then(res => { setSuccess(`✅ ${res.data.message}`); fetchUsers(); })
-      .catch(err => setError(err.response?.data?.message || "Failed to delete user."));
+    api.post("/subjects/assign-teacher", { subjectId: parseInt(selectedSubjectForTeacher), teacherId: parseInt(selectedTeacher) })
+      .then(() => { setSuccess("Teacher assigned!"); fetchSubjects(); setSelectedTeacher(""); })
+      .catch(err => setError(err.response?.data?.message || "Failed."));
   };
 
-  const teachers = users.filter(u => u.role === "TEACHER");
-  const admins   = users.filter(u => u.role === "ADMIN");
-  const fmtDate  = (d) => new Date(d).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
+  const handleRemoveTeacher = (subjectId, teacherId) => {
+    if (!window.confirm("Remove this teacher from the subject?")) return;
+    api.post("/subjects/remove-teacher", { subjectId, teacherId })
+      .then(() => { setSuccess("Teacher removed."); fetchSubjects(); })
+      .catch(() => setError("Failed."));
+  };
 
-  const UserTable = ({ list, label }) => (
-    <div className="user-management-card" style={{ marginBottom: "20px", padding: 0 }}>
-      <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: "8px" }}>
-        <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--ink)" }}>{label}</span>
-        <span className="badge badge-neutral">{list.length}</span>
+  // ── Enrollments ─────────────────────────────────────────────────
+  const handleEnrollSection = section => {
+    if (!selectedSubject) { setError("Select a subject first."); return; }
+    const subj = subjects.find(s => s.id === parseInt(selectedSubject));
+    if (!window.confirm(`Enroll all students from "${section}" into "${subj?.name}"?\nAlready-enrolled students are skipped.`)) return;
+    setEnrollingSectionId(section); setError(""); setSuccess("");
+    api.post("/subjects/enroll-section", { subjectId: parseInt(selectedSubject), section })
+      .then(res => { setSuccess(res.data.message); fetchSubjects(); setEnrollingSectionId(null); })
+      .catch(err => { setEnrollingSectionId(null); setError(err.response?.data?.message || "Failed."); });
+  };
+
+  const handleRemoveEnrollment = (subjectId, studentId) => {
+    if (!window.confirm("Remove this student from the subject?")) return;
+    api.delete("/subjects/remove-enrollment", { data: { subjectId, studentId } })
+      .then(() => { setSuccess("Student removed."); fetchSubjects(); })
+      .catch(() => setError("Failed."));
+  };
+
+  // ── Subject card helper ─────────────────────────────────────────
+  const SubjectCard = ({ subject }) => {
+    const teacherName = subject.teachers.length > 0
+      ? subject.teachers.map(t => t.teacher.name).join(", ")
+      : "Unassigned";
+    return (
+      <div className="subject-card">
+        <div className="subject-card-inner">
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "10px" }}>
+            <span className="subject-code">{subject.code}</span>
+            <div style={{ display: "flex", gap: "6px" }}>
+              <button className="btn-icon" onClick={() => handleStartEdit(subject)} title="Edit">✏️</button>
+              <button
+                className="btn-icon"
+                style={{ background: "var(--red-bg)", borderColor: "var(--red-border)", color: "var(--red)" }}
+                disabled={deletingId === subject.id}
+                onClick={e => handleDeleteSubject(e, subject.id, subject.name)}
+                title="Delete"
+              >
+                {deletingId === subject.id ? "…" : "×"}
+              </button>
+            </div>
+          </div>
+          <div className="subject-name" style={{ marginBottom: "6px" }}>{subject.name}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "12px" }}>
+            <span style={{ fontSize: "11px" }}>👨‍🏫</span>
+            <span style={{ fontSize: "12.5px", color: "var(--ink-muted)" }}>{teacherName}</span>
+          </div>
+          <div className="subject-schedule-block">
+            <div className="subject-schedule-label">Schedule</div>
+            {subject.schedules.length === 0
+              ? <span style={{ fontSize: "12px", color: "var(--ink-faint)" }}>No schedule set</span>
+              : subject.schedules.map((s, i) => (
+                <div key={i} className="subject-sched-row">
+                  <span className="subject-day-pill">{DAY_SHORT[s.dayOfWeek]}</span>
+                  <span style={{ fontSize: "12px", color: "var(--ink-muted)", fontFamily: "var(--font-mono)" }}>
+                    {fmtTime(s.startTime)}–{fmtTime(s.endTime)}
+                  </span>
+                </div>
+              ))
+            }
+          </div>
+          <div style={{ marginTop: "12px" }}>
+            <span className="badge badge-neutral">{subject.enrollments.length} students</span>
+          </div>
+        </div>
       </div>
-      <div className="table-container" style={{ border: "none", borderRadius: 0 }}>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Name</th><th>Email</th><th>Created</th><th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.length === 0 ? (
-              <tr><td colSpan={4} style={{ padding: "32px", textAlign: "center", color: "var(--ink-faint)" }}>No {label.toLowerCase()} yet.</td></tr>
-            ) : list.map(u => (
-              <tr key={u.id}>
-                <td style={{ fontWeight: 600 }}>{u.name}</td>
-                <td style={{ color: "var(--ink-muted)", fontFamily: "var(--font-mono)", fontSize: "12.5px" }}>{u.email}</td>
-                <td style={{ color: "var(--ink-faint)", fontSize: "12px", whiteSpace: "nowrap" }}>{fmtDate(u.createdAt)}</td>
-                <td>
-                  <div style={{ display: "flex", gap: "6px" }}>
-                    <button className="btn btn-ghost btn-sm" onClick={() => openEdit(u)}>✏️ Edit</button>
-                    <button className="btn btn-danger btn-sm" onClick={() => handleDelete(u)} disabled={u.id === currentUserId}>🗑 Delete</button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    );
+  };
+
+  // ── Schedule form rows (reusable) ───────────────────────────────
+  const ScheduleRows = ({ schedules, onChange, onAdd, onRemove }) => (
+    <div className="form-group">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+        <label className="form-label" style={{ margin: 0 }}>Schedule</label>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onAdd}>+ Add Day</button>
       </div>
+      {schedules.map((sched, i) => (
+        <div key={i} className="schedule-row">
+          <select className="form-select" value={sched.dayOfWeek} onChange={e => onChange(i, "dayOfWeek", e.target.value)}>
+            {DAYS.map((d, idx) => <option key={idx} value={idx}>{d}</option>)}
+          </select>
+          <input type="time" className="form-input" value={sched.startTime} onChange={e => onChange(i, "startTime", e.target.value)} />
+          <input type="time" className="form-input" value={sched.endTime}   onChange={e => onChange(i, "endTime",   e.target.value)} />
+          <button type="button" className="btn-icon" disabled={schedules.length === 1} onClick={() => onRemove(i)} style={{ opacity: schedules.length === 1 ? .4 : 1 }}>−</button>
+        </div>
+      ))}
     </div>
   );
 
@@ -146,86 +218,193 @@ function ManageUsers({ dark, toggleDark }) {
 
       <div className="main-area">
         <div className="topbar">
-          <span className="tb-title">Manage Users</span>
+          <span className="tb-title">Manage Classes</span>
           <span className="tb-date">{new Date().toLocaleDateString("en-PH", { weekday: "short", year: "numeric", month: "short", day: "numeric" })}</span>
         </div>
 
         <main className="main-content">
           <div className="page-header">
             <div>
-              <h1>Manage Users</h1>
-              <p>{users.length} registered accounts</p>
+              <h1>Manage Classes</h1>
+              <p>Subjects, teacher assignments, and enrollments</p>
             </div>
-            <button className="btn btn-primary" onClick={() => { setShowModal(true); setError(""); setSuccess(""); }}>+ Add User</button>
           </div>
 
           {error   && <div className="alert alert-error">{error}</div>}
           {success && <div className="alert alert-success">{success}</div>}
 
-          <UserTable list={teachers} label="Faculty / Teachers" />
-          <UserTable list={admins}   label="Administrators" />
+          <div className="tab-navigation">
+            <button className={`tab-btn${activeTab === "subjects"     ? " active" : ""}`} onClick={() => setActiveTab("subjects")}>Subjects</button>
+            <button className={`tab-btn${activeTab === "teachers"     ? " active" : ""}`} onClick={() => setActiveTab("teachers")}>Assign Teachers</button>
+            <button className={`tab-btn${activeTab === "enrollments"  ? " active" : ""}`} onClick={() => setActiveTab("enrollments")}>Enrollment</button>
+          </div>
+
+          {/* ── SUBJECTS TAB ── */}
+          {activeTab === "subjects" && (
+            <div className="tab-content">
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "16px" }}>
+                <button className="btn btn-primary" onClick={() => { resetForm(); setShowAddModal(true); }}>+ New Subject</button>
+              </div>
+              {subjects.length === 0
+                ? <div className="empty-state"><h3>No subjects yet</h3><p>Create one to get started.</p></div>
+                : <div className="subjects-grid">{subjects.map(s => <SubjectCard key={s.id} subject={s} />)}</div>
+              }
+            </div>
+          )}
+
+          {/* ── TEACHERS TAB ── */}
+          {activeTab === "teachers" && (
+            <div className="tab-content">
+              <div className="management-section">
+                <p className="section-title">Assign Teacher to Subject</p>
+                <p className="section-subtitle">A teacher must be assigned before they can see the subject on their dashboard.</p>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Subject</label>
+                    <select className="form-select" value={selectedSubjectForTeacher} onChange={e => setSelectedSubjectForTeacher(e.target.value)}>
+                      <option value="">— Choose subject —</option>
+                      {subjects.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Teacher</label>
+                    <select className="form-select" value={selectedTeacher} onChange={e => setSelectedTeacher(e.target.value)}>
+                      <option value="">— Choose teacher —</option>
+                      {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <button className="btn btn-primary" style={{ maxWidth: "180px" }} onClick={handleAssignTeacher}>Assign Teacher</button>
+              </div>
+
+              <div className="management-section">
+                <p className="section-title">Current Assignments</p>
+                {subjects.every(s => s.teachers.length === 0)
+                  ? <div className="empty-state" style={{ padding: "32px 0" }}><p>No teacher assignments yet.</p></div>
+                  : (
+                    <div className="table-container">
+                      <table className="data-table">
+                        <thead><tr><th>Subject</th><th>Code</th><th>Schedule</th><th>Teacher</th><th>Actions</th></tr></thead>
+                        <tbody>
+                          {subjects.map(subject => subject.teachers.map(st => (
+                            <tr key={`${subject.id}-${st.teacher.id}`}>
+                              <td style={{ fontWeight: 500 }}>{subject.name}</td>
+                              <td><span className="subject-code">{subject.code}</span></td>
+                              <td style={{ fontSize: "13px", color: "var(--ink-muted)" }}>
+                                {subject.schedules.length === 0 ? <span style={{ color: "var(--ink-faint)" }}>No schedule</span>
+                                  : subject.schedules.map((s, i) => <div key={i}>{DAYS[s.dayOfWeek]} {s.startTime}–{s.endTime}</div>)}
+                              </td>
+                              <td>{st.teacher.name}</td>
+                              <td><button className="btn-delete" onClick={() => handleRemoveTeacher(subject.id, st.teacher.id)}>Remove</button></td>
+                            </tr>
+                          )))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
+                }
+              </div>
+            </div>
+          )}
+
+          {/* ── ENROLLMENTS TAB ── */}
+          {activeTab === "enrollments" && (
+            <div className="tab-content">
+              <div className="management-section">
+                <p className="section-title">Enroll Students</p>
+                <p className="section-subtitle">Select a subject, then enroll an entire section at once. Already-enrolled students are skipped.</p>
+                <div className="form-group" style={{ maxWidth: "400px" }}>
+                  <label className="form-label">Select Subject</label>
+                  <select className="form-select" value={selectedSubject} onChange={e => setSelectedSubject(e.target.value)}>
+                    <option value="">— Choose —</option>
+                    {subjects.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
+                  </select>
+                </div>
+
+                {selectedSubject && (
+                  <div style={{ background: "var(--sky-5)", border: "1px solid rgba(14,165,233,.3)", borderRadius: "8px", padding: "16px 20px", marginBottom: "16px" }}>
+                    <p style={{ fontSize: "13px", fontWeight: 700, color: "var(--sky-dark)", marginBottom: "4px" }}>⚡ Enroll Entire Section</p>
+                    <p style={{ fontSize: "12.5px", color: "var(--ink-muted)", marginBottom: "12px" }}>Click a section to enroll all its students.</p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                      {sections.length === 0
+                        ? <p style={{ fontSize: "13px", color: "var(--ink-faint)" }}>No sections found.</p>
+                        : sections.map(section => (
+                          <button key={section} type="button" className="btn btn-ghost btn-sm" disabled={enrollingSectionId === section}
+                            onClick={() => handleEnrollSection(section)}>
+                            {enrollingSectionId === section ? "Enrolling…" : section}
+                          </button>
+                        ))
+                      }
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Current enrollments */}
+              <div className="management-section">
+                <p className="section-title">Current Enrollments</p>
+                {subjects.every(s => s.enrollments.length === 0)
+                  ? <div className="empty-state" style={{ padding: "32px 0" }}><p>No enrollments yet.</p></div>
+                  : subjects.map(subject => {
+                    if (subject.enrollments.length === 0) return null;
+                    return (
+                      <div key={subject.id} className="enrollment-card">
+                        <h3>
+                          {subject.name}
+                          <span style={{ fontWeight: 400, fontSize: "12px", color: "var(--ink-faint)", marginLeft: "6px" }}>({subject.code})</span>
+                          <span style={{ fontWeight: 400, fontSize: "12px", color: "var(--ink-muted)", marginLeft: "8px" }}>— {subject.enrollments.length} student{subject.enrollments.length !== 1 ? "s" : ""}</span>
+                        </h3>
+                        <div className="enrolled-students">
+                          {subject.enrollments.map(e => {
+                            const dn = e.student ? formatDisplayName(e.student.surname, e.student.firstName, e.student.middleInitial) : "Unknown";
+                            return (
+                              <span key={e.id} className="enrolled-student-tag">
+                                {dn}
+                                <button onClick={() => handleRemoveEnrollment(subject.id, e.student.id)}
+                                  style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ink-faint)", fontSize: "11px", padding: "0 2px" }} title={`Remove ${dn}`}>✕</button>
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })
+                }
+              </div>
+            </div>
+          )}
         </main>
       </div>
 
-      {/* Add User Modal */}
-      {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+      {/* ── Add Subject Modal ── */}
+      {showAddModal && (
+        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
           <div className="modal-box" style={{ width: "520px" }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Add New User</h2>
-              <button className="modal-close" onClick={() => setShowModal(false)}>×</button>
+              <h2>Add New Subject</h2>
+              <button className="modal-close" onClick={() => setShowAddModal(false)}>×</button>
             </div>
             <div className="modal-body">
-              {previewName && (
-                <div className="preview-bar">Preview: {previewName}</div>
-              )}
-              {error && <div className="alert alert-error">{error}</div>}
-              <form onSubmit={handleSubmit} className="user-form">
-                <div style={{ display: "grid", gridTemplateColumns: "90px 1fr 60px 1fr", gap: "10px" }}>
+              <form onSubmit={handleSubjectSubmit}>
+                <div style={{ display: "grid", gridTemplateColumns: "130px 1fr", gap: "12px" }}>
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Title</label>
-                    <select name="title" className="form-select" value={formData.title} onChange={handleChange} required>
-                      <option value="">—</option>
-                      {VALID_TITLES.map(t => <option key={t}>{t}</option>)}
-                    </select>
+                    <label className="form-label">Code</label>
+                    <input className="form-input" name="code" placeholder="CPE411" value={subjectForm.code} onChange={handleSubjectChange} required />
+                    <p className="form-help">Must match Pi SUBJECT_CODES.</p>
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">First Name *</label>
-                    <input className="form-input" name="firstName" placeholder="Juan" value={formData.firstName} onChange={handleChange} required />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">M.I.</label>
-                    <input className="form-input" name="middleInitial" placeholder="R" maxLength={1} value={formData.middleInitial} onChange={handleChange} />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Last Name *</label>
-                    <input className="form-input" name="lastName" placeholder="Santos" value={formData.lastName} onChange={handleChange} required />
+                    <label className="form-label">Subject Name</label>
+                    <input className="form-input" name="name" placeholder="Microprocessors…" value={subjectForm.name} onChange={handleSubjectChange} required />
                   </div>
                 </div>
                 <div className="form-group" style={{ marginTop: "10px" }}>
-                  <label className="form-label">Email *</label>
-                  <input className="form-input" name="email" type="email" placeholder="juan.santos@pup.edu.ph" value={formData.email} onChange={handleChange} required />
+                  <label className="form-label">Description (optional)</label>
+                  <textarea className="form-input" name="description" value={subjectForm.description} onChange={handleSubjectChange} />
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Password *</label>
-                    <input className="form-input" name="password" type="password" placeholder="Min. 6 characters" value={formData.password} onChange={handleChange} required />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Confirm Password *</label>
-                    <input className="form-input" name="confirmPassword" type="password" placeholder="Re-enter password" value={formData.confirmPassword} onChange={handleChange} required />
-                  </div>
-                </div>
-                <div className="form-group" style={{ marginTop: "10px" }}>
-                  <label className="form-label">Role</label>
-                  <select name="role" className="form-select" value={formData.role} onChange={handleChange}>
-                    <option value="TEACHER">Teacher</option>
-                    <option value="ADMIN">Admin</option>
-                  </select>
-                </div>
-                <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "6px" }}>
-                  <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                  <button type="submit" className="btn btn-primary" disabled={loading}>{loading ? "Creating…" : "Create User"}</button>
+                <ScheduleRows schedules={subjectForm.schedules} onChange={handleScheduleChange} onAdd={addSchedule} onRemove={removeSchedule} />
+                <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "4px" }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>Cancel</button>
+                  <button type="submit" className="btn btn-primary" disabled={loading}>{loading ? "Creating…" : "Create Subject"}</button>
                 </div>
               </form>
             </div>
@@ -233,29 +412,36 @@ function ManageUsers({ dark, toggleDark }) {
         </div>
       )}
 
-      {/* Edit Modal */}
-      {editUser && (
-        <div className="modal-overlay" onClick={closeEdit}>
-          <div className="modal-box" onClick={e => e.stopPropagation()}>
+      {/* ── Edit Subject Modal ── */}
+      {editingSubjectId && editForm && (
+        <div className="modal-overlay" onClick={handleCancelEdit}>
+          <div className="modal-box" style={{ width: "520px" }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Edit — {editUser.name}</h2>
-              <button className="modal-close" onClick={closeEdit}>×</button>
+              <h2>Edit Subject</h2>
+              <button className="modal-close" onClick={handleCancelEdit}>×</button>
             </div>
             <div className="modal-body">
-              {editError && <div className="alert alert-error">{editError}</div>}
-              <div className="form-group">
-                <label className="form-label">Full Name</label>
-                <input className="form-input" value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))} autoFocus disabled={editLoading} />
-                <p className="form-help">Include title — e.g. Engr. Juan R. Dela Cruz</p>
+              <div style={{ display: "grid", gridTemplateColumns: "130px 1fr", gap: "12px" }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Code</label>
+                  <input className="form-input" name="code" value={editForm.code} onChange={handleEditChange} required />
+                  <p className="form-help">Must match Pi SUBJECT_CODES.</p>
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Subject Name</label>
+                  <input className="form-input" name="name" value={editForm.name} onChange={handleEditChange} autoFocus required />
+                </div>
               </div>
-              <div className="form-group">
-                <label className="form-label">Email Address</label>
-                <input className="form-input" type="email" value={editForm.email} onChange={e => setEditForm(p => ({ ...p, email: e.target.value }))} disabled={editLoading} />
-                <p className="form-help">Must match their Google account for SSO login.</p>
+              <div className="form-group" style={{ marginTop: "10px" }}>
+                <label className="form-label">Description (optional)</label>
+                <textarea className="form-input" name="description" value={editForm.description} onChange={handleEditChange} />
               </div>
-              <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
-                <button className="btn btn-secondary" onClick={closeEdit} disabled={editLoading}>Cancel</button>
-                <button className="btn btn-primary" onClick={handleEditSave} disabled={editLoading}>{editLoading ? "Saving…" : "Save Changes"}</button>
+              <ScheduleRows schedules={editForm.schedules} onChange={handleEditScheduleChange} onAdd={addEditSchedule} onRemove={removeEditSchedule} />
+              <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "4px" }}>
+                <button type="button" className="btn btn-secondary" onClick={handleCancelEdit} disabled={savingId !== null}>Cancel</button>
+                <button type="button" className="btn btn-primary" onClick={() => handleSaveEdit(editingSubjectId)} disabled={savingId !== null}>
+                  {savingId !== null ? "Saving…" : "Save Changes"}
+                </button>
               </div>
             </div>
           </div>
@@ -265,4 +451,4 @@ function ManageUsers({ dark, toggleDark }) {
   );
 }
 
-export default ManageUsers;
+export default ManageClasses;

@@ -1,3 +1,4 @@
+import React from "react";
 // Sidebar.jsx — shared sidebar for ALL pages (admin + teacher)
 // Props:
 //   role        "ADMIN" | "TEACHER"
