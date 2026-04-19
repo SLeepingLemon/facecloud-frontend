@@ -10,8 +10,6 @@ function buildFacultyName(title, firstName, middleInitial, lastName) {
   return `${title} ${firstName.trim()}${mi} ${lastName.trim()}`;
 }
 
-// Parse a formatted name back into parts for the edit form
-// e.g. "Engr. Juan R. Dela Cruz" → { title: "Engr.", name: "Juan R. Dela Cruz" }
 function splitTitle(fullName) {
   if (!fullName) return { title: "", name: "" };
   for (const t of VALID_TITLES) {
@@ -31,6 +29,7 @@ function ManageUsers() {
     .join("")
     .toUpperCase()
     .slice(0, 2);
+
   const currentUserId = (() => {
     try {
       const token = localStorage.getItem("token");
@@ -41,6 +40,7 @@ function ManageUsers() {
     }
   })();
 
+  // ── State ──────────────────────────────────────────────────
   const [formData, setFormData] = useState({
     title: "",
     firstName: "",
@@ -56,8 +56,7 @@ function ManageUsers() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // ── Edit modal state ──
-  const [editUser, setEditUser] = useState(null); // user object being edited
+  const [editUser, setEditUser] = useState(null);
   const [editForm, setEditForm] = useState({ name: "", email: "" });
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState("");
@@ -66,6 +65,7 @@ function ManageUsers() {
     fetchUsers();
   }, []);
 
+  // ── Data ───────────────────────────────────────────────────
   const fetchUsers = () => {
     api
       .get("/auth/users")
@@ -73,6 +73,17 @@ function ManageUsers() {
       .catch(() => {});
   };
 
+  // ── Sidebar helper ──────────────────────────────────────────
+  const toggleClasses = () => {
+    const kids = document.getElementById("sb-kids");
+    const chev = document.getElementById("sb-chev");
+    if (!kids || !chev) return;
+    const isOpen = kids.className.includes("open");
+    kids.className = isOpen ? "sb-kids" : "sb-kids open";
+    chev.className = isOpen ? "sb-chev" : "sb-chev open";
+  };
+
+  // ── Auth ───────────────────────────────────────────────────
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("role");
@@ -80,6 +91,7 @@ function ManageUsers() {
     navigate("/");
   };
 
+  // ── Form ───────────────────────────────────────────────────
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -142,7 +154,7 @@ function ManageUsers() {
       });
   };
 
-  // ── Open edit modal ──
+  // ── Edit modal ─────────────────────────────────────────────
   const openEdit = (user) => {
     setEditUser(user);
     setEditForm({ name: user.name || "", email: user.email || "" });
@@ -172,7 +184,6 @@ function ManageUsers() {
       })
       .then((res) => {
         setSuccess(`✅ Account updated for ${res.data.user.name}.`);
-        // If the admin edited their own account, update localStorage name
         if (editUser.id === currentUserId) {
           localStorage.setItem("name", res.data.user.name);
         }
@@ -186,7 +197,7 @@ function ManageUsers() {
       });
   };
 
-  // ── Delete user ──
+  // ── Delete ─────────────────────────────────────────────────
   const handleDelete = (user) => {
     if (user.id === currentUserId) {
       setError("You cannot delete your own account.");
@@ -211,40 +222,13 @@ function ManageUsers() {
       );
   };
 
+  // ── Derived ────────────────────────────────────────────────
   const teachers = users.filter((u) => u.role === "TEACHER");
   const admins = users.filter((u) => u.role === "ADMIN");
 
-  const col = "8px 0";
-  const tdName = {
-    padding: col,
-    fontWeight: 500,
-    verticalAlign: "middle",
-    width: "30%",
-  };
-  const tdEmail = {
-    padding: col,
-    color: "var(--ink-muted)",
-    fontSize: "13px",
-    verticalAlign: "middle",
-    width: "36%",
-  };
-  const tdDate = {
-    padding: col,
-    color: "var(--ink-faint)",
-    fontSize: "12px",
-    verticalAlign: "middle",
-    whiteSpace: "nowrap",
-    width: "14%",
-    textAlign: "right",
-  };
-  const tdAct = {
-    padding: col,
-    verticalAlign: "middle",
-    width: "20%",
-    textAlign: "right",
-  };
+  // ── Inline styles ──────────────────────────────────────────
   const thStyle = {
-    padding: col,
+    padding: "8px 0",
     fontSize: "11px",
     fontWeight: 700,
     textTransform: "uppercase",
@@ -253,7 +237,12 @@ function ManageUsers() {
     borderBottom: "1px solid var(--border)",
     textAlign: "left",
   };
-  const thRight = { ...thStyle, textAlign: "right" };
+
+  const tdStyle = {
+    padding: "10px 0",
+    verticalAlign: "middle",
+    borderTop: "1px solid var(--border-soft)",
+  };
 
   const btnEdit = {
     padding: "4px 12px",
@@ -268,377 +257,352 @@ function ManageUsers() {
     marginLeft: "6px",
     transition: "all 0.15s",
   };
+
   const btnDel = {
     ...btnEdit,
     color: "#dc2626",
     borderColor: "#fecaca",
   };
 
-  const UserTable = ({ list, label, icon }) => (
-    <div style={{ marginBottom: "28px" }}>
-      <p
-        style={{
-          fontSize: "11px",
-          fontWeight: 700,
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-          color: "var(--ink-muted)",
-          marginBottom: "10px",
-        }}
-      >
-        {icon} {label} ({list.length})
-      </p>
-      {list.length === 0 ? (
-        <p
-          style={{
-            fontSize: "13px",
-            color: "var(--ink-faint)",
-            fontStyle: "italic",
-          }}
-        >
-          No accounts yet.
-        </p>
-      ) : (
-        <table
-          style={{
-            width: "100%",
-            borderCollapse: "collapse",
-            tableLayout: "fixed",
-          }}
-        >
-          <thead>
-            <tr>
-              <th style={thStyle}>Name</th>
-              <th style={thStyle}>Email</th>
-              <th style={{ ...thStyle, ...thRight }}>Created</th>
-              <th style={{ ...thStyle, ...thRight }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.map((u) => (
-              <tr key={u.id}>
-                <td style={tdName}>{u.name}</td>
-                <td style={tdEmail}>{u.email}</td>
-                <td style={tdDate}>
-                  {new Date(u.createdAt).toLocaleDateString("en-PH", {
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                  })}
-                </td>
-                <td style={tdAct}>
-                  <button
-                    style={btnEdit}
-                    onClick={() => openEdit(u)}
-                    onMouseEnter={(e) =>
-                      (e.currentTarget.style.background =
-                        "var(--pup-red-ghost)")
-                    }
-                    onMouseLeave={(e) =>
-                      (e.currentTarget.style.background = "var(--white)")
-                    }
-                  >
-                    ✏️ Edit
-                  </button>
-                  {u.id !== currentUserId && (
-                    <button
-                      style={btnDel}
-                      onClick={() => handleDelete(u)}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = "#fef2f2";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = "var(--white)";
-                      }}
-                    >
-                      🗑 Delete
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </div>
-  );
-
+  // ── Render ─────────────────────────────────────────────────
   return (
     <div className="dashboard">
-      <header className="dashboard-header">
-        <nav className="dashboard-nav">
-          <div className="nav-brand">
-            <div className="nav-brand-icon">🎓</div>
-            <div className="nav-brand-text">
-              <span className="nav-brand-title">FaceCloud</span>
-              <span className="nav-brand-sub">PUP · CPE Department</span>
+      {/* ════ SIDEBAR ════ */}
+      <aside className="sidebar">
+        <div className="sb-top">
+          <div className="sb-brand">
+            <div className="sb-ic">FC</div>
+            <div>
+              <span className="sb-name">FaceCloud</span>
+              <span className="sb-sub">PUP · CPE</span>
+              <div className="sb-online">
+                <span className="dot-pulse"></span>SYSTEM ONLINE
+              </div>
             </div>
           </div>
-          <div className="nav-links">
-            <button
-              className="nav-link"
-              onClick={() => navigate("/admin/AdminDashboard")}
-            >
-              Dashboard
-            </button>
-            <button className="nav-link active">Users</button>
-            <button
-              className="nav-link"
-              onClick={() => navigate("/admin/manage-classes")}
-            >
-              Classes
-            </button>
-            <button
-              className="nav-link"
-              onClick={() => navigate("/admin/sections")}
-            >
-              Sections
-            </button>
-            <button
-              className="nav-link"
-              onClick={() => navigate("/admin/reports")}
-            >
-              Reports
-            </button>
+        </div>
+
+        <nav className="sb-nav">
+          <div className="sb-grp">// MAIN</div>
+
+          <div
+            className="sb-link"
+            onClick={() => navigate("/admin/AdminDashboard")}
+          >
+            <span className="sb-icon">⊞</span>Dashboard
           </div>
-          <div className="dashboard-user">
-            <div className="user-avatar">{initials}</div>
-            <div className="user-info">
-              <div className="user-name">{userName}</div>
-              <div className="user-role">Administrator</div>
-            </div>
-            <button onClick={handleLogout} className="btn-logout">
-              Logout
+
+          <div
+            className="sb-link act"
+            onClick={() => navigate("/admin/manage-users")}
+          >
+            <span className="sb-icon">👥</span>Users
+          </div>
+
+          <div>
+            <button className="sb-dd-par" onClick={toggleClasses}>
+              <span
+                className="sb-icon"
+                style={{ opacity: ".55", fontSize: "13px" }}
+              >
+                📚
+              </span>
+              <span style={{ flex: 1 }}>Classes</span>
+              <span className="sb-chev" id="sb-chev">
+                ›
+              </span>
             </button>
+            <div className="sb-kids" id="sb-kids">
+              <button
+                className="sb-kid"
+                onClick={() => navigate("/admin/manage-classes")}
+              >
+                Subjects
+              </button>
+              <button
+                className="sb-kid"
+                onClick={() => navigate("/admin/manage-classes")}
+              >
+                Assign Teachers
+              </button>
+              <button
+                className="sb-kid"
+                onClick={() => navigate("/admin/manage-classes")}
+              >
+                Enrollments
+              </button>
+            </div>
+          </div>
+
+          <div className="sb-link" onClick={() => navigate("/admin/sections")}>
+            <span className="sb-icon">🏫</span>Sections
+          </div>
+
+          <div className="sb-grp">// ANALYTICS</div>
+
+          <div className="sb-link" onClick={() => navigate("/admin/reports")}>
+            <span className="sb-icon">📊</span>Reports
           </div>
         </nav>
-      </header>
 
-      <main className="dashboard-content">
-        <div style={{ marginBottom: "8px" }}>
-          <button
-            onClick={() => navigate("/admin/AdminDashboard")}
-            className="btn-back"
-          >
-            ← Back to Dashboard
-          </button>
-        </div>
-        <div className="page-header">
-          <h1 className="page-title">Manage Users</h1>
-          <p className="page-subtitle">
-            Create, edit, and manage faculty and administrator accounts.
-          </p>
-        </div>
-
-        {error && (
-          <div className="alert alert-error" style={{ marginBottom: "16px" }}>
-            {error}
+        <div className="sb-foot">
+          <div className="sb-usr">
+            <div className="sb-av">{initials}</div>
+            <div>
+              <div className="sb-uname">{userName}</div>
+              <div className="sb-urole">ADMIN</div>
+            </div>
+            <button className="sb-logout" onClick={handleLogout} title="Logout">
+              ↩
+            </button>
           </div>
-        )}
-        {success && (
-          <div className="alert alert-success" style={{ marginBottom: "16px" }}>
-            {success}
-          </div>
-        )}
+        </div>
+      </aside>
 
-        {/* ── CREATE FORM ── */}
-        <div className="user-management-card">
-          <div
-            style={{
-              marginBottom: "20px",
-              paddingBottom: "16px",
-              borderBottom: "1px solid var(--border)",
-            }}
-          >
-            <p className="section-title">Create New Faculty / Admin Account</p>
-            <p className="section-subtitle" style={{ marginBottom: 0 }}>
-              Add a new faculty member or administrator to the system.
+      {/* ════ MAIN AREA ════ */}
+      <div className="main-area">
+        {/* Topbar */}
+        <div className="topbar">
+          <span className="tb-title">Manage Users</span>
+          <span className="tb-date">
+            {new Date().toLocaleDateString("en-PH", {
+              weekday: "short",
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            })}
+          </span>
+        </div>
+
+        {/* Content */}
+        <main className="main-content">
+          <div style={{ marginBottom: "8px" }}>
+            <button
+              onClick={() => navigate("/admin/AdminDashboard")}
+              className="btn-back"
+            >
+              ← Back to Dashboard
+            </button>
+          </div>
+
+          <div className="page-header">
+            <h1 className="page-title">Manage Users</h1>
+            <p className="page-subtitle">
+              Create, edit, and manage faculty and administrator accounts.
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="user-form">
-            <div
-              className="form-row"
-              style={{ gridTemplateColumns: "140px 1fr", alignItems: "end" }}
-            >
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Title</label>
-                <select
-                  name="title"
-                  className="form-select"
-                  value={formData.title}
-                  onChange={handleChange}
-                  disabled={loading}
-                  required
-                >
-                  <option value="">— Select —</option>
-                  {VALID_TITLES.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Last Name</label>
-                <input
-                  type="text"
-                  name="lastName"
-                  className="form-input"
-                  placeholder="e.g. Dela Cruz"
-                  value={formData.lastName}
-                  onChange={handleChange}
-                  required
-                  disabled={loading}
-                />
-              </div>
-            </div>
+          {error && <div className="alert alert-error">{error}</div>}
+          {success && <div className="alert alert-success">{success}</div>}
 
+          {/* ── Create form ── */}
+          <div className="user-management-card">
             <div
-              className="form-row"
               style={{
-                gridTemplateColumns: "1fr 100px 160px",
-                alignItems: "end",
+                marginBottom: "20px",
+                paddingBottom: "16px",
+                borderBottom: "1px solid var(--border)",
               }}
             >
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">First Name</label>
-                <input
-                  type="text"
-                  name="firstName"
-                  className="form-input"
-                  placeholder="e.g. Juan"
-                  value={formData.firstName}
-                  onChange={handleChange}
-                  required
-                  disabled={loading}
-                />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">
-                  M.I.{" "}
-                  <span
-                    style={{
-                      color: "var(--ink-faint)",
-                      fontWeight: 400,
-                      fontSize: "11px",
-                    }}
-                  >
-                    (opt.)
-                  </span>
-                </label>
-                <input
-                  type="text"
-                  name="middleInitial"
-                  className="form-input"
-                  placeholder="R"
-                  maxLength={1}
-                  style={{ textAlign: "center" }}
-                  value={formData.middleInitial}
-                  onChange={handleChange}
-                  disabled={loading}
-                />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Role</label>
-                <select
-                  name="role"
-                  className="form-select"
-                  value={formData.role}
-                  onChange={handleChange}
-                  disabled={loading}
-                  required
-                >
-                  <option value="TEACHER">Faculty</option>
-                  <option value="ADMIN">Administrator</option>
-                </select>
-              </div>
+              <p className="section-title">
+                Create New Faculty / Admin Account
+              </p>
+              <p className="section-subtitle" style={{ marginBottom: 0 }}>
+                Add a new faculty member or administrator to the system.
+              </p>
             </div>
 
-            {previewName && (
+            <form onSubmit={handleSubmit}>
+              {/* Row 1: Title + Last Name */}
               <div
+                className="form-row"
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "12px",
-                  background: "var(--surface-secondary, var(--surface))",
-                  border: "1px solid var(--border)",
-                  borderRadius: "var(--radius-sm)",
-                  padding: "8px 14px",
+                  gridTemplateColumns: "140px 1fr",
+                  marginBottom: "14px",
                 }}
               >
-                <span
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.06em",
-                    color: "var(--ink-muted)",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  Name preview
-                </span>
-                <span
-                  style={{
-                    fontSize: "15px",
-                    fontWeight: 600,
-                    color: "var(--ink)",
-                  }}
-                >
-                  {previewName}
-                </span>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Title</label>
+                  <select
+                    name="title"
+                    className="form-select"
+                    value={formData.title}
+                    onChange={handleChange}
+                    disabled={loading}
+                    required
+                  >
+                    <option value="">— Select —</option>
+                    {VALID_TITLES.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Last Name</label>
+                  <input
+                    type="text"
+                    name="lastName"
+                    className="form-input"
+                    placeholder="e.g. Dela Cruz"
+                    value={formData.lastName}
+                    onChange={handleChange}
+                    required
+                    disabled={loading}
+                  />
+                </div>
               </div>
-            )}
 
-            <div className="form-group">
-              <label className="form-label">Email Address</label>
-              <input
-                type="email"
-                name="email"
-                className="form-input"
-                placeholder="e.g. juan.delacruz@pup.edu.ph"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                disabled={loading}
-              />
-            </div>
+              {/* Row 2: First Name + MI + Role */}
+              <div
+                className="form-row"
+                style={{
+                  gridTemplateColumns: "1fr 100px 160px",
+                  marginBottom: "14px",
+                }}
+              >
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">First Name</label>
+                  <input
+                    type="text"
+                    name="firstName"
+                    className="form-input"
+                    placeholder="e.g. Juan"
+                    value={formData.firstName}
+                    onChange={handleChange}
+                    required
+                    disabled={loading}
+                  />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">
+                    M.I.{" "}
+                    <span
+                      style={{
+                        color: "var(--ink-faint)",
+                        fontWeight: 400,
+                        fontSize: "11px",
+                      }}
+                    >
+                      (opt.)
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    name="middleInitial"
+                    className="form-input"
+                    placeholder="R"
+                    maxLength={1}
+                    style={{ textAlign: "center" }}
+                    value={formData.middleInitial}
+                    onChange={handleChange}
+                    disabled={loading}
+                  />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Role</label>
+                  <select
+                    name="role"
+                    className="form-select"
+                    value={formData.role}
+                    onChange={handleChange}
+                    disabled={loading}
+                    required
+                  >
+                    <option value="TEACHER">Faculty</option>
+                    <option value="ADMIN">Administrator</option>
+                  </select>
+                </div>
+              </div>
 
-            <div
-              className="form-row"
-              style={{ gridTemplateColumns: "1fr 1fr", alignItems: "end" }}
-            >
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Password</label>
+              {/* Name preview */}
+              {previewName && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "12px",
+                    background: "var(--sky-5)",
+                    border: "1px solid rgba(14,165,233,0.2)",
+                    borderRadius: "var(--radius-sm)",
+                    padding: "8px 14px",
+                    marginBottom: "14px",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                      color: "var(--sky-dark)",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    Preview
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "15px",
+                      fontWeight: 600,
+                      color: "var(--ink)",
+                    }}
+                  >
+                    {previewName}
+                  </span>
+                </div>
+              )}
+
+              {/* Email */}
+              <div className="form-group">
+                <label className="form-label">Email Address</label>
                 <input
-                  type="password"
-                  name="password"
+                  type="email"
+                  name="email"
                   className="form-input"
-                  placeholder="Minimum 6 characters"
-                  value={formData.password}
+                  placeholder="e.g. juan.delacruz@pup.edu.ph"
+                  value={formData.email}
                   onChange={handleChange}
                   required
                   disabled={loading}
-                  minLength={6}
                 />
               </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Confirm Password</label>
-                <input
-                  type="password"
-                  name="confirmPassword"
-                  className="form-input"
-                  placeholder="Re-enter password"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  required
-                  disabled={loading}
-                />
-              </div>
-            </div>
 
-            <div style={{ marginTop: "8px" }}>
+              {/* Row 3: Password + Confirm */}
+              <div
+                className="form-row"
+                style={{ gridTemplateColumns: "1fr 1fr", marginBottom: "14px" }}
+              >
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Password</label>
+                  <input
+                    type="password"
+                    name="password"
+                    className="form-input"
+                    placeholder="Minimum 6 characters"
+                    value={formData.password}
+                    onChange={handleChange}
+                    required
+                    disabled={loading}
+                    minLength={6}
+                  />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Confirm Password</label>
+                  <input
+                    type="password"
+                    name="confirmPassword"
+                    className="form-input"
+                    placeholder="Re-enter password"
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    required
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
               <button
                 type="submit"
                 className="btn btn-primary"
@@ -647,21 +611,247 @@ function ManageUsers() {
               >
                 {loading ? "Creating account…" : "Create Account"}
               </button>
+            </form>
+          </div>
+
+          {/* ── User list ── */}
+          <div className="user-management-card" style={{ marginTop: "24px" }}>
+            <p className="section-title" style={{ marginBottom: "20px" }}>
+              All Users
+            </p>
+
+            {/* Faculty */}
+            <div style={{ marginBottom: "28px" }}>
+              <p
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                  color: "var(--ink-muted)",
+                  marginBottom: "10px",
+                }}
+              >
+                👨‍🏫 Faculty ({teachers.length})
+              </p>
+              {teachers.length === 0 ? (
+                <p
+                  style={{
+                    fontSize: "13px",
+                    color: "var(--ink-faint)",
+                    fontStyle: "italic",
+                  }}
+                >
+                  No faculty accounts yet.
+                </p>
+              ) : (
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    tableLayout: "fixed",
+                  }}
+                >
+                  <thead>
+                    <tr>
+                      <th style={{ ...thStyle, width: "30%" }}>Name</th>
+                      <th style={{ ...thStyle, width: "36%" }}>Email</th>
+                      <th
+                        style={{ ...thStyle, width: "14%", textAlign: "right" }}
+                      >
+                        Created
+                      </th>
+                      <th
+                        style={{ ...thStyle, width: "20%", textAlign: "right" }}
+                      >
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {teachers.map((u) => (
+                      <tr key={u.id}>
+                        <td style={{ ...tdStyle, fontWeight: 500 }}>
+                          {u.name}
+                        </td>
+                        <td
+                          style={{
+                            ...tdStyle,
+                            color: "var(--ink-muted)",
+                            fontSize: "13px",
+                          }}
+                        >
+                          {u.email}
+                        </td>
+                        <td
+                          style={{
+                            ...tdStyle,
+                            color: "var(--ink-faint)",
+                            fontSize: "12px",
+                            textAlign: "right",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {new Date(u.createdAt).toLocaleDateString("en-PH", {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: "right" }}>
+                          <button
+                            style={btnEdit}
+                            onClick={() => openEdit(u)}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = "var(--sky-5)";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = "var(--white)";
+                            }}
+                          >
+                            ✏️ Edit
+                          </button>
+                          {u.id !== currentUserId && (
+                            <button
+                              style={btnDel}
+                              onClick={() => handleDelete(u)}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = "#fef2f2";
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background =
+                                  "var(--white)";
+                              }}
+                            >
+                              🗑 Delete
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
-          </form>
-        </div>
 
-        {/* ── USER LIST ── */}
-        <div className="user-management-card" style={{ marginTop: "24px" }}>
-          <p className="section-title" style={{ marginBottom: "20px" }}>
-            All Users
-          </p>
-          <UserTable list={teachers} label="Faculty" icon="👨‍🏫" />
-          <UserTable list={admins} label="Administrators" icon="🔐" />
-        </div>
-      </main>
+            {/* Administrators */}
+            <div style={{ marginBottom: "8px" }}>
+              <p
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                  color: "var(--ink-muted)",
+                  marginBottom: "10px",
+                }}
+              >
+                🔐 Administrators ({admins.length})
+              </p>
+              {admins.length === 0 ? (
+                <p
+                  style={{
+                    fontSize: "13px",
+                    color: "var(--ink-faint)",
+                    fontStyle: "italic",
+                  }}
+                >
+                  No admin accounts yet.
+                </p>
+              ) : (
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    tableLayout: "fixed",
+                  }}
+                >
+                  <thead>
+                    <tr>
+                      <th style={{ ...thStyle, width: "30%" }}>Name</th>
+                      <th style={{ ...thStyle, width: "36%" }}>Email</th>
+                      <th
+                        style={{ ...thStyle, width: "14%", textAlign: "right" }}
+                      >
+                        Created
+                      </th>
+                      <th
+                        style={{ ...thStyle, width: "20%", textAlign: "right" }}
+                      >
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {admins.map((u) => (
+                      <tr key={u.id}>
+                        <td style={{ ...tdStyle, fontWeight: 500 }}>
+                          {u.name}
+                        </td>
+                        <td
+                          style={{
+                            ...tdStyle,
+                            color: "var(--ink-muted)",
+                            fontSize: "13px",
+                          }}
+                        >
+                          {u.email}
+                        </td>
+                        <td
+                          style={{
+                            ...tdStyle,
+                            color: "var(--ink-faint)",
+                            fontSize: "12px",
+                            textAlign: "right",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {new Date(u.createdAt).toLocaleDateString("en-PH", {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: "right" }}>
+                          <button
+                            style={btnEdit}
+                            onClick={() => openEdit(u)}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = "var(--sky-5)";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = "var(--white)";
+                            }}
+                          >
+                            ✏️ Edit
+                          </button>
+                          {u.id !== currentUserId && (
+                            <button
+                              style={btnDel}
+                              onClick={() => handleDelete(u)}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = "#fef2f2";
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background =
+                                  "var(--white)";
+                              }}
+                            >
+                              🗑 Delete
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </main>
+      </div>
 
-      {/* ── EDIT MODAL ── */}
+      {/* ════ EDIT MODAL ════ */}
       {editUser && (
         <>
           <div
@@ -701,7 +891,6 @@ function ManageUsers() {
                     fontSize: "18px",
                     fontWeight: 700,
                     color: "var(--ink)",
-                    fontFamily: "var(--font-heading)",
                     marginBottom: "4px",
                   }}
                 >

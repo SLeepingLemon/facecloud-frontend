@@ -1,28 +1,19 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
+import Sidebar from "../../components/Sidebar";
 
-function AdminDashboard() {
+function AdminDashboard({ dark, toggleDark }) {
   const navigate = useNavigate();
   const userName = localStorage.getItem("name") || "Admin";
-  const initials = userName
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
 
   const [stats, setStats] = useState({
-    teachers: "--",
-    students: "--",
-    subjects: "--",
-    todaySessions: "--",
+    teachers: "--", students: "--", subjects: "--", todaySessions: "--",
   });
 
   useEffect(() => {
-    api
-      .get("/stats")
-      .then((r) => setStats(r.data))
+    api.get("/stats")
+      .then(r => setStats(r.data))
       .catch(() => {});
   }, []);
 
@@ -33,137 +24,69 @@ function AdminDashboard() {
     navigate("/");
   };
 
+  const today = new Date().toLocaleDateString("en-PH", {
+    weekday: "short", year: "numeric", month: "short", day: "numeric",
+  });
+
   return (
     <div className="dashboard">
-      <header className="dashboard-header">
-        <nav className="dashboard-nav">
-          <div className="nav-brand">
-            <div className="nav-brand-icon">🎓</div>
-            <div className="nav-brand-text">
-              <span className="nav-brand-title">FaceCloud</span>
-              <span className="nav-brand-sub">PUP · CPE Department</span>
-            </div>
-          </div>
-          <div className="nav-links">
-            <button className="nav-link active">Dashboard</button>
-            <button
-              className="nav-link"
-              onClick={() => navigate("/admin/manage-users")}
-            >
-              Users
-            </button>
-            <button
-              className="nav-link"
-              onClick={() => navigate("/admin/manage-classes")}
-            >
-              Classes
-            </button>
-            <button
-              className="nav-link"
-              onClick={() => navigate("/admin/sections")}
-            >
-              Sections
-            </button>
-            <button
-              className="nav-link"
-              onClick={() => navigate("/admin/reports")}
-            >
-              Reports
-            </button>
-          </div>
-          <div className="dashboard-user">
-            <div className="user-avatar">{initials}</div>
-            <div className="user-info">
-              <div className="user-name">{userName}</div>
-              <div className="user-role">Administrator</div>
-            </div>
-            <button onClick={handleLogout} className="btn-logout">
-              Logout
-            </button>
-          </div>
-        </nav>
-      </header>
+      <Sidebar role="ADMIN" dark={dark} onToggleDark={toggleDark} onLogout={handleLogout} />
 
-      <main className="dashboard-content">
-        <div className="welcome-card">
-          <h2>Welcome, {userName}!</h2>
-          <p>Manage your attendance system from this central dashboard.</p>
+      <div className="main-area">
+        {/* Topbar */}
+        <div className="topbar">
+          <span className="tb-title">Dashboard</span>
+          <span className="tb-date">{today}</span>
         </div>
 
-        {/* System Overview */}
-        <div className="quick-stats">
-          <h2 className="section-title">System Overview</h2>
+        <main className="main-content">
+          {/* Welcome banner */}
+          <div className="welcome-banner" style={{ marginBottom: "24px" }}>
+            <div className="welcome-watermark">FC</div>
+            <div className="welcome-inner">
+              <h2>Welcome back, {userName}!</h2>
+              <p>Manage users, classes and attendance from this central hub.</p>
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div className="section-label">System Overview</div>
           <div className="stats-grid">
-            <div className="stat-card">
-              <div className="stat-icon">👨‍🏫</div>
-              <div className="stat-content">
-                <div className="stat-label">Teachers</div>
-                <div className="stat-value">{stats.teachers}</div>
+            {[
+              { icon: "👨‍🏫", label: "Teachers",        value: stats.teachers,      sub: "Active faculty"    },
+              { icon: "👥",  label: "Students",         value: stats.students,      sub: "Across sections"   },
+              { icon: "📚",  label: "Subjects",         value: stats.subjects,      sub: "This semester"     },
+              { icon: "📡",  label: "Today's Sessions", value: stats.todaySessions, sub: "Active now"        },
+            ].map(s => (
+              <div key={s.label} className="stat-card">
+                <div className="stat-icon">{s.icon}</div>
+                <div className="stat-content">
+                  <div className="stat-label">{s.label}</div>
+                  <div className="stat-value">{s.value}</div>
+                  {s.sub && <div className="stat-sub">{s.sub}</div>}
+                </div>
               </div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-icon">👥</div>
-              <div className="stat-content">
-                <div className="stat-label">Students</div>
-                <div className="stat-value">{stats.students}</div>
-              </div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-icon">📚</div>
-              <div className="stat-content">
-                <div className="stat-label">Subjects</div>
-                <div className="stat-value">{stats.subjects}</div>
-              </div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-icon">📅</div>
-              <div className="stat-content">
-                <div className="stat-label">Today's Sessions</div>
-                <div className="stat-value">{stats.todaySessions}</div>
-              </div>
-            </div>
+            ))}
           </div>
-        </div>
 
-        {/* Quick Actions */}
-        <div className="quick-stats">
-          <h2 className="section-title">Quick Actions</h2>
-        </div>
-        <div className="dashboard-grid">
-          <div
-            className="card-item card-clickable"
-            onClick={() => navigate("/admin/manage-users")}
-          >
-            <div className="card-icon">👥</div>
-            <h3 className="card-title">Manage Users</h3>
-            <p>Create and manage faculty and administrator accounts</p>
+          {/* Quick Actions */}
+          <div className="section-label">Quick Actions</div>
+          <div className="action-grid">
+            {[
+              { icon: "👥", title: "Manage Users",   desc: "Create and manage faculty accounts",          path: "/admin/manage-users"    },
+              { icon: "📚", title: "Manage Classes", desc: "Subjects, teachers and enrollment",            path: "/admin/manage-classes"  },
+              { icon: "🏫", title: "Sections",       desc: "View students grouped by section",             path: "/admin/sections"        },
+              { icon: "📊", title: "Reports",        desc: "Attendance analytics and exports",             path: "/admin/reports"         },
+            ].map(a => (
+              <div key={a.title} className="action-card" onClick={() => navigate(a.path)}>
+                <div className="action-icon">{a.icon}</div>
+                <div className="action-title">{a.title}</div>
+                <div className="action-desc">{a.desc}</div>
+              </div>
+            ))}
           </div>
-          <div
-            className="card-item card-clickable"
-            onClick={() => navigate("/admin/manage-classes")}
-          >
-            <div className="card-icon">📚</div>
-            <h3 className="card-title">Manage Classes</h3>
-            <p>Create subjects, manage students, and handle enrollments</p>
-          </div>
-          <div
-            className="card-item card-clickable"
-            onClick={() => navigate("/admin/sections")}
-          >
-            <div className="card-icon">🏫</div>
-            <h3 className="card-title">Sections</h3>
-            <p>View all students grouped by their section</p>
-          </div>
-          <div
-            className="card-item card-clickable"
-            onClick={() => navigate("/admin/reports")}
-          >
-            <div className="card-icon">📊</div>
-            <h3 className="card-title">View Reports</h3>
-            <p>Access attendance reports and analytics</p>
-          </div>
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

@@ -1,1210 +1,268 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
+import Sidebar from "../../components/Sidebar";
 
-const DAYS = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-];
+const VALID_TITLES = ["Engr.", "Dr.", "Prof.", "Mr.", "Ms.", "Mrs."];
 
-function formatDisplayName(surname, firstName, middleInitial) {
-  if (!surname || !firstName) return "";
+function buildFacultyName(title, firstName, middleInitial, lastName) {
+  if (!title || !firstName || !lastName) return "";
   const mi = middleInitial ? ` ${middleInitial.trim().toUpperCase()}.` : "";
-  return `${surname.trim().toUpperCase()}, ${firstName.trim()}${mi}`;
+  return `${title} ${firstName.trim()}${mi} ${lastName.trim()}`;
 }
 
-function ManageClasses() {
+function ManageUsers({ dark, toggleDark }) {
   const navigate = useNavigate();
-  const location = useLocation();
   const userName = localStorage.getItem("name") || "Admin";
-  const initials = userName
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
 
-  // ── State ──────────────────────────────────────────────────────
-  const [sections, setSections] = useState([]);
-  const [activeTab, setActiveTab] = useState(location.state?.tab || "subjects");
+  const currentUserId = (() => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return null;
+      return JSON.parse(atob(token.split(".")[1])).userId;
+    } catch { return null; }
+  })();
 
-  const [subjects, setSubjects] = useState([]);
-  const [subjectForm, setSubjectForm] = useState({
-    name: "",
-    code: "",
-    description: "",
-    schedules: [{ dayOfWeek: 1, startTime: "08:00", endTime: "09:00" }],
+  const [formData, setFormData] = useState({
+    title: "", firstName: "", middleInitial: "", lastName: "",
+    email: "", password: "", confirmPassword: "", role: "TEACHER",
   });
-  const [deletingId, setDeletingId] = useState(null);
-  const [editingSubjectId, setEditingSubjectId] = useState(null);
-  const [editForm, setEditForm] = useState(null);
-  const [savingId, setSavingId] = useState(null);
+  const [users,        setUsers]        = useState([]);
+  const [loading,      setLoading]      = useState(false);
+  const [error,        setError]        = useState("");
+  const [success,      setSuccess]      = useState("");
+  const [showModal,    setShowModal]    = useState(false);
+  const [editUser,     setEditUser]     = useState(null);
+  const [editForm,     setEditForm]     = useState({ name: "", email: "" });
+  const [editLoading,  setEditLoading]  = useState(false);
+  const [editError,    setEditError]    = useState("");
 
-  const [teachers, setTeachers] = useState([]);
-  const [selectedSubjectForTeacher, setSelectedSubjectForTeacher] =
-    useState("");
-  const [selectedTeacher, setSelectedTeacher] = useState("");
+  useEffect(() => { fetchUsers(); }, []);
 
-  const [selectedSubject, setSelectedSubject] = useState("");
-  const [enrollingSectionId, setEnrollingSectionId] = useState(null);
-
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  // ── Fetch ───────────────────────────────────────────────────────
-  const fetchData = () => {
-    fetchSubjects();
-    fetchTeachers();
-    api
-      .get("/sections")
-      .then((r) => setSections(r.data))
-      .catch(() => {});
-  };
-  const fetchSubjects = () => {
-    api
-      .get("/subjects")
-      .then((r) => setSubjects(r.data))
-      .catch(() => {});
-  };
-  const fetchTeachers = () => {
-    api
-      .get("/auth/users")
-      .then((r) => setTeachers(r.data.filter((u) => u.role === "TEACHER")))
-      .catch(() => setTeachers([]));
+  const fetchUsers = () => {
+    api.get("/auth/users").then(r => setUsers(r.data)).catch(() => {});
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("role");
-    localStorage.removeItem("name");
+    localStorage.removeItem("token"); localStorage.removeItem("role"); localStorage.removeItem("name");
     navigate("/");
   };
 
-  // ── Subjects ────────────────────────────────────────────────────
-  const handleSubjectChange = (e) => {
+  const handleChange = (e) => {
     const { name, value } = e.target;
-    setSubjectForm((p) => ({ ...p, [name]: value }));
+    setFormData(p => ({ ...p, [name]: value }));
   };
-  const handleScheduleChange = (index, field, value) =>
-    setSubjectForm((prev) => ({
-      ...prev,
-      schedules: prev.schedules.map((s, i) =>
-        i !== index
-          ? s
-          : { ...s, [field]: field === "dayOfWeek" ? parseInt(value) : value },
-      ),
-    }));
-  const addSchedule = () =>
-    setSubjectForm((p) => ({
-      ...p,
-      schedules: [
-        ...p.schedules,
-        { dayOfWeek: 1, startTime: "08:00", endTime: "09:00" },
-      ],
-    }));
-  const removeSchedule = (index) =>
-    setSubjectForm((p) => ({
-      ...p,
-      schedules: p.schedules.filter((_, i) => i !== index),
-    }));
 
-  const handleSubjectSubmit = (e) => {
+  const previewName = buildFacultyName(formData.title, formData.firstName, formData.middleInitial, formData.lastName);
+
+  const handleSubmit = (e) => {
     e.preventDefault();
+    setError(""); setSuccess("");
+    if (formData.password !== formData.confirmPassword) { setError("Passwords do not match."); return; }
+    if (formData.password.length < 6) { setError("Password must be at least 6 characters."); return; }
+    if (!formData.title) { setError("Please select a title."); return; }
     setLoading(true);
-    setError("");
-    setSuccess("");
-    api
-      .post("/subjects", subjectForm)
-      .then(() => {
-        setSuccess("Subject created!");
-        setSubjectForm({
-          name: "",
-          code: "",
-          description: "",
-          schedules: [{ dayOfWeek: 1, startTime: "08:00", endTime: "09:00" }],
-        });
-        fetchSubjects();
-        setLoading(false);
+    api.post("/auth/register-admin", {
+      title: formData.title, firstName: formData.firstName.trim(),
+      middleInitial: formData.middleInitial.trim(), lastName: formData.lastName.trim(),
+      email: formData.email.trim(), password: formData.password, role: formData.role,
+    })
+      .then(res => {
+        const roleName = formData.role === "TEACHER" ? "Faculty" : "Administrator";
+        setSuccess(`✅ ${roleName} account created for ${res.data.name}.`);
+        setFormData({ title: "", firstName: "", middleInitial: "", lastName: "", email: "", password: "", confirmPassword: "", role: "TEACHER" });
+        setShowModal(false); fetchUsers(); setLoading(false);
       })
-      .catch((err) => {
-        setError(err.response?.data?.message || "Failed.");
-        setLoading(false);
-      });
+      .catch(err => { setError(err.response?.data?.message || "Registration failed."); setLoading(false); });
   };
 
-  const handleStartEdit = (subject) => {
-    setEditingSubjectId(subject.id);
-    setEditForm({
-      name: subject.name,
-      code: subject.code,
-      description: subject.description || "",
-      schedules:
-        subject.schedules.length > 0
-          ? subject.schedules.map((s) => ({
-              dayOfWeek: s.dayOfWeek,
-              startTime: s.startTime,
-              endTime: s.endTime,
-            }))
-          : [{ dayOfWeek: 1, startTime: "08:00", endTime: "09:00" }],
-    });
-    setError("");
-    setSuccess("");
-  };
-  const handleCancelEdit = () => {
-    setEditingSubjectId(null);
-    setEditForm(null);
-  };
-  const handleEditChange = (e) => {
-    const { name, value } = e.target;
-    setEditForm((p) => ({ ...p, [name]: value }));
-  };
-  const handleEditScheduleChange = (index, field, value) =>
-    setEditForm((prev) => ({
-      ...prev,
-      schedules: prev.schedules.map((s, i) =>
-        i !== index
-          ? s
-          : { ...s, [field]: field === "dayOfWeek" ? parseInt(value) : value },
-      ),
-    }));
-  const addEditSchedule = () =>
-    setEditForm((p) => ({
-      ...p,
-      schedules: [
-        ...p.schedules,
-        { dayOfWeek: 1, startTime: "08:00", endTime: "09:00" },
-      ],
-    }));
-  const removeEditSchedule = (index) =>
-    setEditForm((p) => ({
-      ...p,
-      schedules: p.schedules.filter((_, i) => i !== index),
-    }));
+  const openEdit = (user) => { setEditUser(user); setEditForm({ name: user.name || "", email: user.email || "" }); setEditError(""); };
+  const closeEdit = () => { setEditUser(null); setEditError(""); };
 
-  const handleSaveEdit = (subjectId) => {
-    if (!editForm.name.trim() || !editForm.code.trim()) {
-      setError("Name and code required.");
-      return;
-    }
-    if (editForm.schedules.length === 0) {
-      setError("At least one schedule required.");
-      return;
-    }
-    setSavingId(subjectId);
-    setError("");
-    setSuccess("");
-    api
-      .put(`/subjects/${subjectId}`, {
-        name: editForm.name.trim(),
-        code: editForm.code.trim(),
-        description: editForm.description.trim(),
-        schedules: editForm.schedules,
+  const handleEditSave = () => {
+    if (!editForm.name.trim())  { setEditError("Name cannot be empty."); return; }
+    if (!editForm.email.trim()) { setEditError("Email cannot be empty."); return; }
+    setEditLoading(true); setEditError("");
+    api.put(`/auth/users/${editUser.id}`, { name: editForm.name.trim(), email: editForm.email.trim() })
+      .then(res => {
+        setSuccess(`✅ Account updated for ${res.data.user.name}.`);
+        if (editUser.id === currentUserId) localStorage.setItem("name", res.data.user.name);
+        fetchUsers(); closeEdit(); setEditLoading(false);
       })
-      .then((res) => {
-        setSubjects((prev) =>
-          prev.map((s) => (s.id === subjectId ? res.data.subject : s)),
-        );
-        setSuccess(`Subject "${res.data.subject.name}" updated.`);
-        setEditingSubjectId(null);
-        setEditForm(null);
-        setSavingId(null);
-      })
-      .catch((err) => {
-        setSavingId(null);
-        setError(err.response?.data?.message || "Failed.");
-      });
+      .catch(err => { setEditError(err.response?.data?.message || "Update failed."); setEditLoading(false); });
   };
 
-  const handleDeleteSubject = (e, subjectId, subjectName) => {
-    e.stopPropagation();
-    e.preventDefault();
-    if (
-      !window.confirm(
-        `Delete "${subjectName}"?\n\nThis removes all enrollments, teacher assignments, and attendance records. This cannot be undone.`,
-      )
-    )
-      return;
-    setDeletingId(subjectId);
-    setError("");
-    setSuccess("");
-    api
-      .delete(`/subjects/${subjectId}`)
-      .then(() => {
-        setSubjects((prev) => prev.filter((s) => s.id !== subjectId));
-        setSuccess(`"${subjectName}" deleted.`);
-        if (selectedSubject === String(subjectId)) setSelectedSubject("");
-        if (selectedSubjectForTeacher === String(subjectId))
-          setSelectedSubjectForTeacher("");
-        if (editingSubjectId === subjectId) handleCancelEdit();
-        setDeletingId(null);
-      })
-      .catch((err) => {
-        setDeletingId(null);
-        setError(
-          err.response
-            ? `Delete failed (${err.response.status}): ${err.response.data?.message || "Unknown"}`
-            : "No response from server.",
-        );
-      });
+  const handleDelete = (user) => {
+    if (user.id === currentUserId) { setError("You cannot delete your own account."); return; }
+    if (!window.confirm(`Delete account for ${user.name}?\n\nThis cannot be undone.`)) return;
+    setError(""); setSuccess("");
+    api.delete(`/auth/users/${user.id}`)
+      .then(res => { setSuccess(`✅ ${res.data.message}`); fetchUsers(); })
+      .catch(err => setError(err.response?.data?.message || "Failed to delete user."));
   };
 
-  // ── Teachers ────────────────────────────────────────────────────
-  const handleAssignTeacher = () => {
-    if (!selectedSubjectForTeacher || !selectedTeacher) {
-      setError("Select both a subject and a teacher.");
-      return;
-    }
-    setError("");
-    setSuccess("");
-    api
-      .post("/subjects/assign-teacher", {
-        subjectId: parseInt(selectedSubjectForTeacher),
-        teacherId: parseInt(selectedTeacher),
-      })
-      .then(() => {
-        setSuccess("Teacher assigned!");
-        fetchSubjects();
-        setSelectedTeacher("");
-      })
-      .catch((err) => setError(err.response?.data?.message || "Failed."));
-  };
+  const teachers = users.filter(u => u.role === "TEACHER");
+  const admins   = users.filter(u => u.role === "ADMIN");
+  const fmtDate  = (d) => new Date(d).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
 
-  const handleRemoveTeacher = (subjectId, teacherId) => {
-    if (!window.confirm("Remove this teacher from the subject?")) return;
-    api
-      .post("/subjects/remove-teacher", { subjectId, teacherId })
-      .then(() => {
-        setSuccess("Teacher removed.");
-        fetchSubjects();
-      })
-      .catch(() => setError("Failed."));
-  };
+  const UserTable = ({ list, label }) => (
+    <div className="user-management-card" style={{ marginBottom: "20px", padding: 0 }}>
+      <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: "8px" }}>
+        <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--ink)" }}>{label}</span>
+        <span className="badge badge-neutral">{list.length}</span>
+      </div>
+      <div className="table-container" style={{ border: "none", borderRadius: 0 }}>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Name</th><th>Email</th><th>Created</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.length === 0 ? (
+              <tr><td colSpan={4} style={{ padding: "32px", textAlign: "center", color: "var(--ink-faint)" }}>No {label.toLowerCase()} yet.</td></tr>
+            ) : list.map(u => (
+              <tr key={u.id}>
+                <td style={{ fontWeight: 600 }}>{u.name}</td>
+                <td style={{ color: "var(--ink-muted)", fontFamily: "var(--font-mono)", fontSize: "12.5px" }}>{u.email}</td>
+                <td style={{ color: "var(--ink-faint)", fontSize: "12px", whiteSpace: "nowrap" }}>{fmtDate(u.createdAt)}</td>
+                <td>
+                  <div style={{ display: "flex", gap: "6px" }}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => openEdit(u)}>✏️ Edit</button>
+                    <button className="btn btn-danger btn-sm" onClick={() => handleDelete(u)} disabled={u.id === currentUserId}>🗑 Delete</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 
-  // ── Enrollments ─────────────────────────────────────────────────
-  const handleEnrollSection = (section) => {
-    if (!selectedSubject) {
-      setError("Select a subject first.");
-      return;
-    }
-    const subj = subjects.find((s) => s.id === parseInt(selectedSubject));
-    if (
-      !window.confirm(
-        `Enroll all students from "${section}" into "${subj?.name}"?\nAlready-enrolled students are skipped.`,
-      )
-    )
-      return;
-    setEnrollingSectionId(section);
-    setError("");
-    setSuccess("");
-    api
-      .post("/subjects/enroll-section", {
-        subjectId: parseInt(selectedSubject),
-        section,
-      })
-      .then((res) => {
-        setSuccess(res.data.message);
-        fetchSubjects();
-        setEnrollingSectionId(null);
-      })
-      .catch((err) => {
-        setEnrollingSectionId(null);
-        setError(err.response?.data?.message || "Failed.");
-      });
-  };
-
-  const handleRemoveEnrollment = (subjectId, studentId) => {
-    if (!window.confirm("Remove this student from the subject?")) return;
-    api
-      .delete("/subjects/remove-enrollment", { data: { subjectId, studentId } })
-      .then(() => {
-        setSuccess("Student removed.");
-        fetchSubjects();
-      })
-      .catch(() => setError("Failed."));
-  };
-
-  // ── Helpers ─────────────────────────────────────────────────────
-  const getDayName = (d) => DAYS[d];
-
-  // ── Render ──────────────────────────────────────────────────────
   return (
     <div className="dashboard">
-      <header className="dashboard-header">
-        <nav className="dashboard-nav">
-          <div className="nav-brand">
-            <div className="nav-brand-icon">🎓</div>
-            <div className="nav-brand-text">
-              <span className="nav-brand-title">FaceCloud</span>
-              <span className="nav-brand-sub">PUP · CPE Department</span>
+      <Sidebar role="ADMIN" dark={dark} onToggleDark={toggleDark} onLogout={handleLogout} />
+
+      <div className="main-area">
+        <div className="topbar">
+          <span className="tb-title">Manage Users</span>
+          <span className="tb-date">{new Date().toLocaleDateString("en-PH", { weekday: "short", year: "numeric", month: "short", day: "numeric" })}</span>
+        </div>
+
+        <main className="main-content">
+          <div className="page-header">
+            <div>
+              <h1>Manage Users</h1>
+              <p>{users.length} registered accounts</p>
             </div>
+            <button className="btn btn-primary" onClick={() => { setShowModal(true); setError(""); setSuccess(""); }}>+ Add User</button>
           </div>
-          <div className="nav-links">
-            <button
-              className="nav-link"
-              onClick={() => navigate("/admin/AdminDashboard")}
-            >
-              Dashboard
-            </button>
-            <button
-              className="nav-link"
-              onClick={() => navigate("/admin/manage-users")}
-            >
-              Users
-            </button>
-            <button className="nav-link active">Classes</button>
-            <button
-              className="nav-link"
-              onClick={() => navigate("/admin/sections")}
-            >
-              Sections
-            </button>
-            <button
-              className="nav-link"
-              onClick={() => navigate("/admin/reports")}
-            >
-              Reports
-            </button>
-          </div>
-          <div className="dashboard-user">
-            <div className="user-avatar">{initials}</div>
-            <div className="user-info">
-              <div className="user-name">{userName}</div>
-              <div className="user-role">Administrator</div>
+
+          {error   && <div className="alert alert-error">{error}</div>}
+          {success && <div className="alert alert-success">{success}</div>}
+
+          <UserTable list={teachers} label="Faculty / Teachers" />
+          <UserTable list={admins}   label="Administrators" />
+        </main>
+      </div>
+
+      {/* Add User Modal */}
+      {showModal && (
+        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="modal-box" style={{ width: "520px" }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Add New User</h2>
+              <button className="modal-close" onClick={() => setShowModal(false)}>×</button>
             </div>
-            <button onClick={handleLogout} className="btn-logout">
-              Logout
-            </button>
-          </div>
-        </nav>
-      </header>
-
-      <main className="dashboard-content">
-        <div style={{ marginBottom: "8px" }}>
-          <button
-            onClick={() => navigate("/admin/AdminDashboard")}
-            className="btn-back"
-          >
-            ← Back to Dashboard
-          </button>
-        </div>
-        <div className="page-header">
-          <h1 className="page-title">Manage Classes</h1>
-          <p className="page-subtitle">
-            Subjects, teacher assignments, and enrollments.
-          </p>
-        </div>
-
-        {error && <div className="alert alert-error">{error}</div>}
-        {success && <div className="alert alert-success">{success}</div>}
-
-        <div className="tab-navigation">
-          <button
-            className={"tab-btn" + (activeTab === "subjects" ? " active" : "")}
-            onClick={() => setActiveTab("subjects")}
-          >
-            📚 Subjects
-          </button>
-          <button
-            className={"tab-btn" + (activeTab === "teachers" ? " active" : "")}
-            onClick={() => setActiveTab("teachers")}
-          >
-            👨‍🏫 Assign Teachers
-          </button>
-          <button
-            className={
-              "tab-btn" + (activeTab === "enrollments" ? " active" : "")
-            }
-            onClick={() => setActiveTab("enrollments")}
-          >
-            📝 Enrollments
-          </button>
-        </div>
-
-        {/* ══════════════════════════════════════════════════════
-            SUBJECTS TAB
-        ══════════════════════════════════════════════════════ */}
-        {activeTab === "subjects" && (
-          <div className="tab-content">
-            {/* Add new subject */}
-            <div className="management-section">
-              <p className="section-title">Add New Subject</p>
-              <p className="section-subtitle">
-                Create a subject and define its weekly schedule.
-              </p>
-              <form onSubmit={handleSubjectSubmit}>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label">Subject Code</label>
-                    <input
-                      type="text"
-                      name="code"
-                      className="form-input"
-                      placeholder="e.g. CPE305"
-                      value={subjectForm.code}
-                      onChange={handleSubjectChange}
-                      required
-                    />
-                    <p className="form-help">
-                      Must match SUBJECT_CODES on the Pi exactly.
-                    </p>
+            <div className="modal-body">
+              {previewName && (
+                <div className="preview-bar">Preview: {previewName}</div>
+              )}
+              {error && <div className="alert alert-error">{error}</div>}
+              <form onSubmit={handleSubmit} className="user-form">
+                <div style={{ display: "grid", gridTemplateColumns: "90px 1fr 60px 1fr", gap: "10px" }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Title</label>
+                    <select name="title" className="form-select" value={formData.title} onChange={handleChange} required>
+                      <option value="">—</option>
+                      {VALID_TITLES.map(t => <option key={t}>{t}</option>)}
+                    </select>
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">Subject Name</label>
-                    <input
-                      type="text"
-                      name="name"
-                      className="form-input"
-                      placeholder="e.g. Embedded Systems"
-                      value={subjectForm.name}
-                      onChange={handleSubjectChange}
-                      required
-                    />
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">First Name *</label>
+                    <input className="form-input" name="firstName" placeholder="Juan" value={formData.firstName} onChange={handleChange} required />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">M.I.</label>
+                    <input className="form-input" name="middleInitial" placeholder="R" maxLength={1} value={formData.middleInitial} onChange={handleChange} />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Last Name *</label>
+                    <input className="form-input" name="lastName" placeholder="Santos" value={formData.lastName} onChange={handleChange} required />
                   </div>
                 </div>
-                <div className="form-group">
-                  <label className="form-label">
-                    Description{" "}
-                    <span
-                      style={{
-                        color: "var(--ink-faint)",
-                        fontWeight: 400,
-                        fontSize: "12px",
-                      }}
-                    >
-                      (optional)
-                    </span>
-                  </label>
-                  <input
-                    type="text"
-                    name="description"
-                    className="form-input"
-                    placeholder="Brief description"
-                    value={subjectForm.description}
-                    onChange={handleSubjectChange}
-                  />
+                <div className="form-group" style={{ marginTop: "10px" }}>
+                  <label className="form-label">Email *</label>
+                  <input className="form-input" name="email" type="email" placeholder="juan.santos@pup.edu.ph" value={formData.email} onChange={handleChange} required />
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Weekly Schedule</label>
-                  {subjectForm.schedules.map((schedule, index) => (
-                    <div key={index} className="schedule-row">
-                      <select
-                        className="form-select"
-                        value={schedule.dayOfWeek}
-                        onChange={(e) =>
-                          handleScheduleChange(
-                            index,
-                            "dayOfWeek",
-                            e.target.value,
-                          )
-                        }
-                      >
-                        {DAYS.map((d, i) => (
-                          <option key={i} value={i}>
-                            {d}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        type="time"
-                        className="form-input"
-                        value={schedule.startTime}
-                        onChange={(e) =>
-                          handleScheduleChange(
-                            index,
-                            "startTime",
-                            e.target.value,
-                          )
-                        }
-                      />
-                      <input
-                        type="time"
-                        className="form-input"
-                        value={schedule.endTime}
-                        onChange={(e) =>
-                          handleScheduleChange(index, "endTime", e.target.value)
-                        }
-                      />
-                      {subjectForm.schedules.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeSchedule(index)}
-                          className="btn-icon"
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={addSchedule}
-                    className="btn-secondary"
-                    style={{ marginTop: "8px" }}
-                  >
-                    + Add Schedule
-                  </button>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Password *</label>
+                    <input className="form-input" name="password" type="password" placeholder="Min. 6 characters" value={formData.password} onChange={handleChange} required />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Confirm Password *</label>
+                    <input className="form-input" name="confirmPassword" type="password" placeholder="Re-enter password" value={formData.confirmPassword} onChange={handleChange} required />
+                  </div>
                 </div>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={loading}
-                  style={{ maxWidth: "180px" }}
-                >
-                  {loading ? "Creating…" : "Create Subject"}
-                </button>
+                <div className="form-group" style={{ marginTop: "10px" }}>
+                  <label className="form-label">Role</label>
+                  <select name="role" className="form-select" value={formData.role} onChange={handleChange}>
+                    <option value="TEACHER">Teacher</option>
+                    <option value="ADMIN">Admin</option>
+                  </select>
+                </div>
+                <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "6px" }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
+                  <button type="submit" className="btn btn-primary" disabled={loading}>{loading ? "Creating…" : "Create User"}</button>
+                </div>
               </form>
             </div>
-
-            {/* All subjects list */}
-            <div className="management-section">
-              <p className="section-title">All Subjects</p>
-              {subjects.length === 0 ? (
-                <div className="empty-state">
-                  <p>No subjects yet. Create one above.</p>
-                </div>
-              ) : (
-                <div className="table-container">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Code</th>
-                        <th>Name</th>
-                        <th>Schedules</th>
-                        <th>Teacher(s)</th>
-                        <th>Students</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {subjects.map((subject) => (
-                        <tr key={subject.id}>
-                          <td>
-                            <span className="subject-code">{subject.code}</span>
-                          </td>
-                          <td style={{ fontWeight: 500 }}>{subject.name}</td>
-                          <td
-                            style={{
-                              fontSize: "13px",
-                              color: "var(--ink-muted)",
-                            }}
-                          >
-                            {subject.schedules.length === 0 ? (
-                              <span style={{ color: "var(--ink-faint)" }}>
-                                No schedule
-                              </span>
-                            ) : (
-                              subject.schedules.map((s, i) => (
-                                <div key={i}>
-                                  {getDayName(s.dayOfWeek)} {s.startTime}–
-                                  {s.endTime}
-                                </div>
-                              ))
-                            )}
-                          </td>
-                          <td style={{ fontSize: "13px" }}>
-                            {subject.teachers.length === 0 ? (
-                              <span style={{ color: "var(--ink-faint)" }}>
-                                Unassigned
-                              </span>
-                            ) : (
-                              subject.teachers.map((t) => (
-                                <div key={t.id}>{t.teacher.name}</div>
-                              ))
-                            )}
-                          </td>
-                          <td
-                            style={{
-                              fontSize: "13px",
-                              color: "var(--ink-muted)",
-                              textAlign: "center",
-                            }}
-                          >
-                            {subject.enrollments.length}
-                          </td>
-                          <td>
-                            <div style={{ display: "flex", gap: "6px" }}>
-                              <button
-                                className="btn-secondary"
-                                style={{
-                                  padding: "4px 10px",
-                                  fontSize: "12px",
-                                }}
-                                onClick={() => handleStartEdit(subject)}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                className="btn-delete"
-                                disabled={deletingId === subject.id}
-                                onClick={(e) =>
-                                  handleDeleteSubject(
-                                    e,
-                                    subject.id,
-                                    subject.name,
-                                  )
-                                }
-                              >
-                                {deletingId === subject.id ? "…" : "Delete"}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* ══════════════════════════════════════════════════════
-            ASSIGN TEACHERS TAB
-        ══════════════════════════════════════════════════════ */}
-        {activeTab === "teachers" && (
-          <div className="tab-content">
-            {/* Assign form */}
-            <div className="management-section">
-              <p className="section-title">Assign Teacher to Subject</p>
-              <p className="section-subtitle">
-                A teacher must be assigned before they can see the subject on
-                their dashboard.
-              </p>
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Subject</label>
-                  <select
-                    className="form-select"
-                    value={selectedSubjectForTeacher}
-                    onChange={(e) =>
-                      setSelectedSubjectForTeacher(e.target.value)
-                    }
-                  >
-                    <option value="">— Choose subject —</option>
-                    {subjects.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({s.code})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Teacher</label>
-                  <select
-                    className="form-select"
-                    value={selectedTeacher}
-                    onChange={(e) => setSelectedTeacher(e.target.value)}
-                  >
-                    <option value="">— Choose teacher —</option>
-                    {teachers.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <button
-                className="btn btn-primary"
-                style={{ maxWidth: "180px" }}
-                onClick={handleAssignTeacher}
-              >
-                Assign Teacher
-              </button>
+      {/* Edit Modal */}
+      {editUser && (
+        <div className="modal-overlay" onClick={closeEdit}>
+          <div className="modal-box" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Edit — {editUser.name}</h2>
+              <button className="modal-close" onClick={closeEdit}>×</button>
             </div>
-
-            {/* Current assignments */}
-            <div className="management-section">
-              <p className="section-title">Current Assignments</p>
-              {subjects.every((s) => s.teachers.length === 0) ? (
-                <div className="empty-state">
-                  <p>No teacher assignments yet.</p>
-                </div>
-              ) : (
-                <div className="table-container">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Subject</th>
-                        <th>Code</th>
-                        <th>Schedule</th>
-                        <th>Teacher</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {subjects.map((subject) =>
-                        subject.teachers.map((st) => (
-                          <tr key={`${subject.id}-${st.teacher.id}`}>
-                            <td style={{ fontWeight: 500 }}>{subject.name}</td>
-                            <td>
-                              <span className="subject-code">
-                                {subject.code}
-                              </span>
-                            </td>
-                            <td
-                              style={{
-                                fontSize: "13px",
-                                color: "var(--ink-muted)",
-                              }}
-                            >
-                              {subject.schedules.length === 0 ? (
-                                <span style={{ color: "var(--ink-faint)" }}>
-                                  No schedule
-                                </span>
-                              ) : (
-                                subject.schedules.map((s, i) => (
-                                  <div key={i}>
-                                    {getDayName(s.dayOfWeek)} {s.startTime}–
-                                    {s.endTime}
-                                  </div>
-                                ))
-                              )}
-                            </td>
-                            <td>{st.teacher.name}</td>
-                            <td>
-                              <button
-                                className="btn-delete"
-                                onClick={() =>
-                                  handleRemoveTeacher(subject.id, st.teacher.id)
-                                }
-                              >
-                                Remove
-                              </button>
-                            </td>
-                          </tr>
-                        )),
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ══════════════════════════════════════════════════════
-            ENROLLMENTS TAB
-        ══════════════════════════════════════════════════════ */}
-        {activeTab === "enrollments" && (
-          <div className="tab-content">
-            {/* Enroll by section */}
-            <div className="management-section">
-              <p className="section-title">Enroll Students</p>
-              <p className="section-subtitle">
-                Select a subject, then enroll an entire section at once.
-              </p>
-
-              <div className="form-group" style={{ maxWidth: "400px" }}>
-                <label className="form-label">Select Subject</label>
-                <select
-                  className="form-select"
-                  value={selectedSubject}
-                  onChange={(e) => setSelectedSubject(e.target.value)}
-                >
-                  <option value="">— Choose —</option>
-                  {subjects.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.code})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {selectedSubject && (
-                <div
-                  style={{
-                    background: "var(--pup-red-ghost)",
-                    border: "1px solid rgba(14,165,233,0.3)",
-                    borderRadius: "var(--radius)",
-                    padding: "16px 20px",
-                    marginBottom: "24px",
-                  }}
-                >
-                  <p
-                    style={{
-                      fontSize: "13px",
-                      fontWeight: 700,
-                      color: "var(--pup-red)",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.06em",
-                      marginBottom: "8px",
-                    }}
-                  >
-                    ⚡ Enroll Entire Section
-                  </p>
-                  <p
-                    style={{
-                      fontSize: "13px",
-                      color: "var(--ink-muted)",
-                      marginBottom: "12px",
-                    }}
-                  >
-                    Enroll all students from a section at once. Already-enrolled
-                    students are skipped.
-                  </p>
-                  <div
-                    style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}
-                  >
-                    {sections.length === 0 ? (
-                      <p
-                        style={{ fontSize: "13px", color: "var(--ink-faint)" }}
-                      >
-                        No sections found.
-                      </p>
-                    ) : (
-                      sections.map((section) => {
-                        const isEnrolling = enrollingSectionId === section;
-                        return (
-                          <button
-                            key={section}
-                            type="button"
-                            disabled={isEnrolling}
-                            onClick={() => handleEnrollSection(section)}
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "6px",
-                              padding: "6px 14px",
-                              background: isEnrolling
-                                ? "var(--border)"
-                                : "var(--pup-red)",
-                              color: isEnrolling ? "var(--ink-muted)" : "#fff",
-                              border: "none",
-                              borderRadius: "var(--radius-sm)",
-                              fontSize: "13px",
-                              fontWeight: 600,
-                              fontFamily: "inherit",
-                              cursor: isEnrolling ? "not-allowed" : "pointer",
-                              transition: "all 0.18s",
-                            }}
-                          >
-                            {isEnrolling ? "Enrolling…" : section}
-                          </button>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Current enrollments summary */}
-            <div className="management-section">
-              <p className="section-title">Current Enrollments</p>
-              {subjects.every((s) => s.enrollments.length === 0) ? (
-                <div className="empty-state" style={{ padding: "36px 0" }}>
-                  <p>No enrollments yet.</p>
-                </div>
-              ) : (
-                subjects.map((subject) => {
-                  if (subject.enrollments.length === 0) return null;
-                  return (
-                    <div key={subject.id} className="enrollment-card">
-                      <h3>
-                        {subject.name}
-                        <span
-                          style={{
-                            fontFamily: "inherit",
-                            fontWeight: 400,
-                            fontSize: "12px",
-                            color: "var(--ink-faint)",
-                            marginLeft: "6px",
-                          }}
-                        >
-                          ({subject.code})
-                        </span>
-                        <span
-                          style={{
-                            fontFamily: "inherit",
-                            fontWeight: 400,
-                            fontSize: "12px",
-                            color: "var(--ink-muted)",
-                            marginLeft: "8px",
-                          }}
-                        >
-                          — {subject.enrollments.length} student
-                          {subject.enrollments.length !== 1 ? "s" : ""}
-                        </span>
-                      </h3>
-                      <div className="enrolled-students">
-                        {subject.enrollments.map((e) => {
-                          const dn = e.student
-                            ? formatDisplayName(
-                                e.student.surname,
-                                e.student.firstName,
-                                e.student.middleInitial,
-                              )
-                            : "Unknown";
-                          return (
-                            <span
-                              key={e.id}
-                              className="enrolled-student-tag"
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "5px",
-                              }}
-                            >
-                              {dn}
-                              <button
-                                onClick={() =>
-                                  handleRemoveEnrollment(
-                                    subject.id,
-                                    e.student.id,
-                                  )
-                                }
-                                style={{
-                                  background: "none",
-                                  border: "none",
-                                  cursor: "pointer",
-                                  color: "var(--ink-faint)",
-                                  fontSize: "11px",
-                                  lineHeight: 1,
-                                  padding: "0 2px",
-                                  fontFamily: "inherit",
-                                }}
-                                title={`Remove ${dn}`}
-                              >
-                                ✕
-                              </button>
-                            </span>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ══════════════════════════════════════════════════════
-            EDIT SUBJECT MODAL
-        ══════════════════════════════════════════════════════ */}
-        {editingSubjectId && editForm && (
-          <>
-            <div
-              onClick={handleCancelEdit}
-              style={{
-                position: "fixed",
-                inset: 0,
-                background: "rgba(0,0,0,0.45)",
-                zIndex: 1000,
-              }}
-            />
-            <div
-              style={{
-                position: "fixed",
-                top: "50%",
-                left: "50%",
-                transform: "translate(-50%,-50%)",
-                zIndex: 1001,
-                width: "min(720px,94vw)",
-                maxHeight: "90vh",
-                overflowY: "auto",
-                background: "var(--white)",
-                borderRadius: "var(--radius-lg)",
-                boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
-                padding: "32px 40px",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  marginBottom: "24px",
-                }}
-              >
-                <div>
-                  <p
-                    style={{
-                      fontSize: "18px",
-                      fontWeight: 700,
-                      color: "var(--ink)",
-                      fontFamily: "var(--font-heading)",
-                      marginBottom: "4px",
-                    }}
-                  >
-                    Edit Subject
-                  </p>
-                  <p style={{ fontSize: "13px", color: "var(--ink-muted)" }}>
-                    Changes take effect immediately.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleCancelEdit}
-                  style={{
-                    width: "32px",
-                    height: "32px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    background: "none",
-                    border: "1px solid var(--border)",
-                    borderRadius: "var(--radius-sm)",
-                    cursor: "pointer",
-                    fontSize: "16px",
-                    color: "var(--ink-muted)",
-                    flexShrink: 0,
-                  }}
-                >
-                  ✕
-                </button>
-              </div>
-
-              <div className="form-row" style={{ marginBottom: "14px" }}>
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">Subject Name</label>
-                  <input
-                    type="text"
-                    name="name"
-                    className="form-input"
-                    value={editForm.name}
-                    onChange={handleEditChange}
-                    autoFocus
-                    required
-                  />
-                </div>
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">Subject Code</label>
-                  <input
-                    type="text"
-                    name="code"
-                    className="form-input"
-                    value={editForm.code}
-                    onChange={handleEditChange}
-                    required
-                  />
-                  <p className="form-help">
-                    Must match SUBJECT_CODES on the Pi.
-                  </p>
-                </div>
-              </div>
-
+            <div className="modal-body">
+              {editError && <div className="alert alert-error">{editError}</div>}
               <div className="form-group">
-                <label className="form-label">Description (Optional)</label>
-                <textarea
-                  name="description"
-                  className="form-input"
-                  value={editForm.description}
-                  onChange={handleEditChange}
-                  rows={2}
-                  style={{ resize: "vertical" }}
-                />
+                <label className="form-label">Full Name</label>
+                <input className="form-input" value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))} autoFocus disabled={editLoading} />
+                <p className="form-help">Include title — e.g. Engr. Juan R. Dela Cruz</p>
               </div>
-
               <div className="form-group">
-                <label className="form-label">Weekly Schedule</label>
-                {editForm.schedules.map((schedule, index) => (
-                  <div key={index} className="schedule-row">
-                    <select
-                      className="form-select"
-                      value={schedule.dayOfWeek}
-                      onChange={(e) =>
-                        handleEditScheduleChange(
-                          index,
-                          "dayOfWeek",
-                          e.target.value,
-                        )
-                      }
-                    >
-                      {DAYS.map((d, i) => (
-                        <option key={i} value={i}>
-                          {d}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      type="time"
-                      className="form-input"
-                      value={schedule.startTime}
-                      onChange={(e) =>
-                        handleEditScheduleChange(
-                          index,
-                          "startTime",
-                          e.target.value,
-                        )
-                      }
-                    />
-                    <input
-                      type="time"
-                      className="form-input"
-                      value={schedule.endTime}
-                      onChange={(e) =>
-                        handleEditScheduleChange(
-                          index,
-                          "endTime",
-                          e.target.value,
-                        )
-                      }
-                    />
-                    {editForm.schedules.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeEditSchedule(index)}
-                        className="btn-icon"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={addEditSchedule}
-                  className="btn-secondary"
-                  style={{ marginTop: "8px" }}
-                >
-                  + Add Schedule
-                </button>
+                <label className="form-label">Email Address</label>
+                <input className="form-input" type="email" value={editForm.email} onChange={e => setEditForm(p => ({ ...p, email: e.target.value }))} disabled={editLoading} />
+                <p className="form-help">Must match their Google account for SSO login.</p>
               </div>
-
-              <div
-                style={{
-                  borderTop: "1px solid var(--border)",
-                  margin: "20px 0",
-                }}
-              />
-              <div style={{ display: "flex", gap: "10px" }}>
-                <button
-                  type="button"
-                  disabled={savingId !== null}
-                  onClick={() => handleSaveEdit(editingSubjectId)}
-                  className="btn btn-primary"
-                  style={{ flex: 1 }}
-                >
-                  {savingId !== null ? "Saving…" : "Save Changes"}
-                </button>
-                <button
-                  type="button"
-                  disabled={savingId !== null}
-                  onClick={handleCancelEdit}
-                  className="btn-secondary"
-                  style={{ flex: 1 }}
-                >
-                  Cancel
-                </button>
+              <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+                <button className="btn btn-secondary" onClick={closeEdit} disabled={editLoading}>Cancel</button>
+                <button className="btn btn-primary" onClick={handleEditSave} disabled={editLoading}>{editLoading ? "Saving…" : "Save Changes"}</button>
               </div>
             </div>
-          </>
-        )}
-      </main>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-export default ManageClasses;
+export default ManageUsers;
