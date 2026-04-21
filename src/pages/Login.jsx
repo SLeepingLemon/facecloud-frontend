@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
 import api from "../services/api";
 import buildingImg from "../../images/building.jpg";
+import logoImg from "../../images/logo.png";
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 
@@ -44,7 +45,9 @@ function LoginForm() {
       <div style={{ position:"absolute",top:0,left:0,right:0,height:"3px", background:"linear-gradient(90deg,#0ea5e9,#38bdf8,#7dd3fc)" }} />
 
       <div style={{ textAlign:"center", marginBottom:"32px" }}>
-        <div style={{ width:"60px",height:"60px",borderRadius:"14px",background:"linear-gradient(135deg,#0284c7,#0ea5e9)",margin:"0 auto 16px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"26px",boxShadow:"0 4px 16px rgba(14,165,233,0.35)" }}>🎓</div>
+        <div style={{ width:"72px",height:"72px",borderRadius:"16px",background:"rgba(255,255,255,0.15)",margin:"0 auto 16px",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 16px rgba(0,0,0,0.25)",overflow:"hidden" }}>
+            <img src={logoImg} alt="FaceCloud logo" style={{ width:"56px",height:"56px",objectFit:"contain" }} />
+          </div>
         <h1 style={{ fontSize:"22px",fontWeight:800,color:"#fff",letterSpacing:"-0.02em",margin:"0 0 6px",...font }}>FaceCloud</h1>
         <p style={{ fontSize:"12.5px",color:"rgba(186,230,253,0.9)",margin:0,letterSpacing:"0.02em",...font }}>PUP Computer Engineering · Attendance System</p>
       </div>

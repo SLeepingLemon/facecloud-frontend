@@ -1,4 +1,5 @@
 import React from "react";
+import logoImg from "../../images/logo.png";
 // Sidebar.jsx — shared sidebar for ALL pages (admin + teacher)
 // Props:
 //   role        "ADMIN" | "TEACHER"
@@ -68,7 +69,7 @@ export default function Sidebar({ role, dark, onToggleDark, onLogout }) {
       {/* Brand */}
       <div className="sb-top">
         <div className="sb-brand">
-          <div className="sb-ic">🎓</div>
+          <div className="sb-ic"><img src={logoImg} alt="FaceCloud logo" style={{ width:"100%",height:"100%",objectFit:"contain",display:"block" }} /></div>
           <div>
             <span className="sb-name">FaceCloud</span>
             <span className="sb-sub">PUP · CPE</span>
