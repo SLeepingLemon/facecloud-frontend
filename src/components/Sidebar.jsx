@@ -10,44 +10,79 @@ import logoImg from "../../images/logo.png";
 import { useNavigate, useLocation } from "react-router-dom";
 
 const ADMIN_NAV = [
-  { id: "dashboard",  label: "Dashboard", icon: "⊞", path: "/admin/AdminDashboard" },
-  { id: "users",      label: "Users",     icon: "◎", path: "/admin/manage-users"   },
   {
-    id: "classes", label: "Classes", icon: "◈",
+    id: "dashboard",
+    label: "Dashboard",
+    icon: "⊞",
+    path: "/admin/AdminDashboard",
+  },
+  { id: "users", label: "Users", icon: "◎", path: "/admin/manage-users" },
+  {
+    id: "classes",
+    label: "Classes",
+    icon: "◈",
     children: [
-      { id: "classes-subjects",  label: "Subjects",        path: "/admin/manage-classes?tab=subjects"  },
-      { id: "classes-teachers",  label: "Assign Teachers", path: "/admin/manage-classes?tab=teachers"  },
-      { id: "classes-enroll",    label: "Enrollment",      path: "/admin/manage-classes?tab=enroll"    },
+      {
+        id: "classes-subjects",
+        label: "Subjects",
+        path: "/admin/manage-classes?tab=subjects",
+      },
+      {
+        id: "classes-teachers",
+        label: "Assign Teachers",
+        path: "/admin/manage-classes?tab=teachers",
+      },
+      {
+        id: "classes-enroll",
+        label: "Enrollment",
+        path: "/admin/manage-classes?tab=enroll",
+      },
     ],
   },
-  { id: "sections",   label: "Sections",  icon: "⊟", path: "/admin/sections"       },
-  { id: "reports",    label: "Reports",   icon: "◫", path: "/admin/reports"         },
+  { id: "sections", label: "Sections", icon: "⊟", path: "/admin/sections" },
+  { id: "reports", label: "Reports", icon: "◫", path: "/admin/reports" },
 ];
 
 const TEACHER_NAV = [
-  { id: "teacher-dashboard", label: "My Classes",   icon: "◈", path: "/teacher/TeacherDashboard" },
-  { id: "teacher-session",   label: "Live Session", icon: "◉", path: "/teacher/TeacherDashboard" },
+  {
+    id: "teacher-dashboard",
+    label: "My Classes",
+    icon: "◈",
+    path: "/teacher/TeacherDashboard",
+  },
+  {
+    id: "teacher-session",
+    label: "Live Session",
+    icon: "◉",
+    path: "/teacher/TeacherDashboard",
+  },
 ];
 
 export default function Sidebar({ role, dark, onToggleDark, onLogout }) {
-  const navigate   = useNavigate();
-  const location   = useLocation();
-  const nav        = role === "TEACHER" ? TEACHER_NAV : ADMIN_NAV;
-  const userName   = localStorage.getItem("name") || (role === "TEACHER" ? "Teacher" : "Admin");
-  const initials   = userName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const nav = role === "TEACHER" ? TEACHER_NAV : ADMIN_NAV;
+  const userName =
+    localStorage.getItem("name") || (role === "TEACHER" ? "Teacher" : "Admin");
+  const initials = userName
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
 
   // Determine active page from URL
   const path = location.pathname + location.search;
   const getActive = () => {
     if (path.includes("manage-classes")) {
       if (path.includes("tab=teachers")) return "classes-teachers";
-      if (path.includes("tab=enroll"))   return "classes-enroll";
+      if (path.includes("tab=enroll")) return "classes-enroll";
       return "classes-subjects";
     }
     if (path.includes("AdminDashboard")) return "dashboard";
-    if (path.includes("manage-users"))   return "users";
-    if (path.includes("sections"))       return "sections";
-    if (path.includes("reports"))        return "reports";
+    if (path.includes("manage-users")) return "users";
+    if (path.includes("sections")) return "sections";
+    if (path.includes("reports")) return "reports";
     if (path.includes("TeacherDashboard")) return "teacher-dashboard";
     return "";
   };
@@ -55,12 +90,12 @@ export default function Sidebar({ role, dark, onToggleDark, onLogout }) {
   const classesOpen = activePage.startsWith("classes");
 
   const [classOpen, setClassOpen] = React.useState(classesOpen);
-  React.useEffect(() => { if (classesOpen) setClassOpen(true); }, [classesOpen]);
+  React.useEffect(() => {
+    if (classesOpen) setClassOpen(true);
+  }, [classesOpen]);
 
   const isActive = (id) =>
-    id === "classes"
-      ? activePage.startsWith("classes")
-      : activePage === id;
+    id === "classes" ? activePage.startsWith("classes") : activePage === id;
 
   const goTo = (p) => navigate(p);
 
@@ -69,7 +104,19 @@ export default function Sidebar({ role, dark, onToggleDark, onLogout }) {
       {/* Brand */}
       <div className="sb-top">
         <div className="sb-brand">
-          <div className="sb-ic"><img src={logoImg} alt="FaceCloud logo" style={{ width:"100%",height:"100%",objectFit:"contain",display:"block" }} /></div>
+          <div className="sb-ic">
+            <img
+              src={logoImg}
+              alt="FaceCloud logo"
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover", // fills better than contain
+                borderRadius: "12px", // 👈 rounds the image itself
+                display: "block",
+              }}
+            />
+          </div>
           <div>
             <span className="sb-name">FaceCloud</span>
             <span className="sb-sub">PUP · CPE</span>
@@ -84,21 +131,28 @@ export default function Sidebar({ role, dark, onToggleDark, onLogout }) {
 
       {/* Nav */}
       <nav className="sb-nav">
-        {nav.map(item => {
+        {nav.map((item) => {
           const active = isActive(item.id);
           if (item.children) {
             return (
               <div key={item.id}>
                 <button
                   className={`sb-dd-par${active ? " act" : ""}`}
-                  onClick={() => setClassOpen(o => !o)}
+                  onClick={() => setClassOpen((o) => !o)}
                 >
-                  <span className="sb-icon" style={{ opacity: .55, fontSize: "13px" }}>{item.icon}</span>
+                  <span
+                    className="sb-icon"
+                    style={{ opacity: 0.55, fontSize: "13px" }}
+                  >
+                    {item.icon}
+                  </span>
                   <span style={{ flex: 1 }}>{item.label}</span>
-                  <span className={`sb-chev${classOpen ? " open" : ""}`}>▶</span>
+                  <span className={`sb-chev${classOpen ? " open" : ""}`}>
+                    ▶
+                  </span>
                 </button>
                 <div className={`sb-kids${classOpen ? " open" : ""}`}>
-                  {item.children.map(child => (
+                  {item.children.map((child) => (
                     <button
                       key={child.id}
                       className={`sb-kid${activePage === child.id ? " act" : ""}`}
@@ -144,10 +198,23 @@ export default function Sidebar({ role, dark, onToggleDark, onLogout }) {
         <div className="sb-usr">
           <div className="sb-av">{initials}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="sb-uname" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{userName}</div>
-            <div className="sb-urole">{role === "TEACHER" ? "FACULTY" : "ADMIN"}</div>
+            <div
+              className="sb-uname"
+              style={{
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {userName}
+            </div>
+            <div className="sb-urole">
+              {role === "TEACHER" ? "FACULTY" : "ADMIN"}
+            </div>
           </div>
-          <button className="sb-logout" onClick={onLogout} title="Logout">↩</button>
+          <button className="sb-logout" onClick={onLogout} title="Logout">
+            ↩
+          </button>
         </div>
       </div>
     </aside>

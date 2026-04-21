@@ -104,9 +104,9 @@ function LoginForm() {
             style={{
               width: "100%",
               height: "100%",
-              objectFit: "contain",
-              opacity: 0.9,
-              filter: "brightness(1.1) contrast(0.9) saturate(0.9) blur(0.4px)",
+              objectFit: "cover", // fills better than contain
+              borderRadius: "12px", // 👈 rounds the image itself
+              display: "block",
             }}
           />
         </div>
