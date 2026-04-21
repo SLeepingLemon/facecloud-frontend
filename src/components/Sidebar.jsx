@@ -212,8 +212,8 @@ export default function Sidebar({ role, dark, onToggleDark, onLogout }) {
               {role === "TEACHER" ? "FACULTY" : "ADMIN"}
             </div>
           </div>
-          <button className="sb-logout" onClick={onLogout} title="Logout">
-            ↩
+          <button className="sb-logout" onClick={onLogout}>
+            Logout
           </button>
         </div>
       </div>
