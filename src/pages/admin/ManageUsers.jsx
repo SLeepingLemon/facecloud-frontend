@@ -31,8 +31,6 @@ function ManageUsers({ dark, toggleDark }) {
     middleInitial: "",
     lastName: "",
     email: "",
-    password: "",
-    confirmPassword: "",
     role: "TEACHER",
   });
   const [users, setUsers] = useState([]);
@@ -79,14 +77,6 @@ function ManageUsers({ dark, toggleDark }) {
     e.preventDefault();
     setError("");
     setSuccess("");
-    if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match.");
-      return;
-    }
-    if (formData.password.length < 6) {
-      setError("Password must be at least 6 characters.");
-      return;
-    }
     if (!formData.title) {
       setError("Please select a title.");
       return;
@@ -99,7 +89,6 @@ function ManageUsers({ dark, toggleDark }) {
         middleInitial: formData.middleInitial.trim(),
         lastName: formData.lastName.trim(),
         email: formData.email.trim(),
-        password: formData.password,
         role: formData.role,
       })
       .then((res) => {
@@ -112,8 +101,6 @@ function ManageUsers({ dark, toggleDark }) {
           middleInitial: "",
           lastName: "",
           email: "",
-          password: "",
-          confirmPassword: "",
           role: "TEACHER",
         });
         setShowModal(false);
@@ -433,38 +420,6 @@ function ManageUsers({ dark, toggleDark }) {
                     onChange={handleChange}
                     required
                   />
-                </div>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: "12px",
-                  }}
-                >
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Password *</label>
-                    <input
-                      className="form-input"
-                      name="password"
-                      type="password"
-                      placeholder="Min. 6 characters"
-                      value={formData.password}
-                      onChange={handleChange}
-                      required
-                    />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Confirm Password *</label>
-                    <input
-                      className="form-input"
-                      name="confirmPassword"
-                      type="password"
-                      placeholder="Re-enter password"
-                      value={formData.confirmPassword}
-                      onChange={handleChange}
-                      required
-                    />
-                  </div>
                 </div>
                 <div className="form-group" style={{ marginTop: "10px" }}>
                   <label className="form-label">Role</label>

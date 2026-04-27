@@ -680,6 +680,10 @@ body {
   margin-bottom: 28px;
 }
 
+.stats-grid-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
 .stat-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -1958,7 +1962,33 @@ textarea.form-input {
     grid-template-columns: 1fr;
   }
   .session-stat-pills {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .session-stat-pill {
+    padding: 10px 6px;
+  }
+  .session-stat-count {
+    font-size: 22px;
+  }
+  .main-content {
+    padding: 16px 14px;
+  }
+  .stats-grid-3 .stat-card {
+    flex-direction: column;
+    padding: 10px;
+    gap: 6px;
+    align-items: flex-start;
+  }
+  .stats-grid-3 .stat-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+  }
+  .stats-grid-3 .stat-value {
+    font-size: 20px;
+  }
+  .stats-grid-3 .stat-sub {
+    display: none;
   }
   .section-layout {
     flex-direction: column;

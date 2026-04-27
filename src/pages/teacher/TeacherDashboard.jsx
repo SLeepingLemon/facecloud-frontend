@@ -584,10 +584,7 @@ function TeacherDashboard({ dark, toggleDark }) {
             </div>
 
             {/* Stats */}
-            <div
-              className="stats-grid"
-              style={{ gridTemplateColumns: "repeat(3,1fr)" }}
-            >
+            <div className="stats-grid stats-grid-3">
               <div className="stat-card">
                 <div className="stat-icon">📚</div>
                 <div className="stat-content">
@@ -907,10 +904,7 @@ function TeacherDashboard({ dark, toggleDark }) {
               )}
             </div>
 
-            <div
-              className="stats-grid"
-              style={{ gridTemplateColumns: "repeat(3,1fr)" }}
-            >
+            <div className="stats-grid stats-grid-3">
               <div className="stat-card">
                 <div className="stat-icon">📅</div>
                 <div className="stat-content">
@@ -1423,7 +1417,7 @@ function TeacherDashboard({ dark, toggleDark }) {
               >
                 <input
                   className="form-input"
-                  style={{ width: "240px" }}
+                  style={{ flex: "1", minWidth: "160px", maxWidth: "300px" }}
                   placeholder="Search student…"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
