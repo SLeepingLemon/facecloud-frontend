@@ -163,16 +163,19 @@ function TeacherDashboard({ dark, toggleDark }) {
       );
       es.addEventListener("attendance_update", (e) => {
         const data = JSON.parse(e.data);
-        setCurrentSession((prev) =>
-          !prev
-            ? prev
-            : {
-                ...prev,
-                records: prev.records.map((r) =>
-                  r.id === data.record.id ? data.record : r,
-                ),
-              },
-        );
+        setCurrentSession((prev) => {
+          if (!prev) return prev;
+          const exists = prev.records.some((r) => r.id === data.record.id);
+          if (exists) {
+            return {
+              ...prev,
+              records: prev.records.map((r) =>
+                r.id === data.record.id ? data.record : r,
+              ),
+            };
+          }
+          return { ...prev, records: [...prev.records, data.record] };
+        });
       });
       es.addEventListener("session_started", (e) => {
         const cls = selectedClassRef.current;
