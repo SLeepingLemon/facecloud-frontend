@@ -96,9 +96,13 @@ function TeacherDashboard({ dark, toggleDark }) {
 
   const sseRef = useRef(null);
   const selectedClassRef = useRef(null);
+  const currentSessionRef = useRef(null);
   useEffect(() => {
     selectedClassRef.current = selectedClass;
   }, [selectedClass]);
+  useEffect(() => {
+    currentSessionRef.current = currentSession;
+  }, [currentSession]);
 
   // Derive section-aware class list from subjects
   // Each entry: { key, subjectId, subjectCode, subjectName, section, schedules, subject, enrollments }
@@ -222,8 +226,14 @@ function TeacherDashboard({ dark, toggleDark }) {
           .get(`/attendance/session/${cls.subjectId}${sectionParam}`)
           .then((res) => {
             setActiveSessions((prev) => ({ ...prev, [cls.key]: !!res.data }));
-            if (res.data && !selectedClassRef.current && !showHistory) {
+            const selCls = selectedClassRef.current;
+            if (res.data && !selCls && !showHistory) {
+              // No class selected yet — auto-navigate to the live session
               setSelectedClass(cls);
+              setCurrentSession(res.data);
+            } else if (res.data && selCls?.key === cls.key && !currentSessionRef.current) {
+              // Teacher is viewing this class but no session was showing —
+              // Pi just auto-created one, update within the next poll cycle
               setCurrentSession(res.data);
             }
           })
