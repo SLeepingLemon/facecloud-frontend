@@ -120,7 +120,7 @@ function ManageClasses({ dark, toggleDark }) {
   const [removingSection, setRemovingSection]   = useState(null);
 
   // Enrolled students collapse
-  const [showStudents, setShowStudents] = useState(false);
+  const [showStudents, setShowStudents] = useState(true);
 
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
@@ -426,7 +426,7 @@ function ManageClasses({ dark, toggleDark }) {
                     className={`subject-list-item${enrollSubjectId === String(s.id) ? " selected" : ""}`}
                     onClick={() => {
                       setEnrollSubjectId(String(s.id));
-                      setShowStudents(false);
+                      setShowStudents(true);
                       setSelectedTeacher("");
                       setError("");
                       setSuccess("");

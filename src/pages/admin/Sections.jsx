@@ -161,17 +161,13 @@ function Sections({ dark, toggleDark }) {
                           </div>
                           <button className="btn btn-danger btn-sm" onClick={() => handleDeleteSection(selected)}>🗑 Delete</button>
                         </div>
-                        <div className="section-stats-row">
-                          {[
-                            { label: "Total Students", value: selectedStudents.length },
-                            { label: "Regular",        value: selectedStudents.filter(s => s.status === "Regular").length },
-                            { label: "Irregular",      value: selectedStudents.filter(s => s.status === "Irregular").length },
-                          ].map((stat, i) => (
-                            <div key={i} className="section-stat">
-                              <div className="section-stat-val">{stat.value}</div>
-                              <div className="section-stat-lbl">{stat.label}</div>
-                            </div>
-                          ))}
+                        <div style={{ padding: "14px 20px", display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span style={{ fontSize: "28px", fontWeight: 800, fontFamily: "var(--font-mono)", color: "var(--ink)", lineHeight: 1 }}>
+                            {selectedStudents.length}
+                          </span>
+                          <span style={{ fontSize: "12px", color: "var(--ink-faint)", lineHeight: 1.4 }}>
+                            student{selectedStudents.length !== 1 ? "s" : ""}<br />enrolled
+                          </span>
                         </div>
                       </div>
 
