@@ -950,40 +950,64 @@ function ManageClasses({ dark, toggleDark }) {
                             {subject.enrollments.length !== 1 ? "s" : ""}
                           </span>
                         </h3>
-                        <div className="enrolled-students">
-                          {subject.enrollments.map((e) => {
-                            const dn = e.student
-                              ? formatDisplayName(
-                                  e.student.surname,
-                                  e.student.firstName,
-                                  e.student.middleInitial,
-                                )
-                              : "Unknown";
-                            return (
-                              <span key={e.id} className="enrolled-student-tag">
-                                {dn}
-                                <button
-                                  onClick={() =>
-                                    handleRemoveEnrollment(
-                                      subject.id,
-                                      e.student.id,
+                        <div className="table-container" style={{ marginTop: "12px" }}>
+                          <table className="data-table">
+                            <thead>
+                              <tr>
+                                <th style={{ width: "40px", textAlign: "center" }}>#</th>
+                                <th>Student Name</th>
+                                <th>Student ID</th>
+                                <th style={{ width: "90px" }}>Action</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {subject.enrollments.map((e, idx) => {
+                                const dn = e.student
+                                  ? formatDisplayName(
+                                      e.student.surname,
+                                      e.student.firstName,
+                                      e.student.middleInitial,
                                     )
-                                  }
-                                  style={{
-                                    background: "none",
-                                    border: "none",
-                                    cursor: "pointer",
-                                    color: "var(--ink-faint)",
-                                    fontSize: "11px",
-                                    padding: "0 2px",
-                                  }}
-                                  title={`Remove ${dn}`}
-                                >
-                                  ✕
-                                </button>
-                              </span>
-                            );
-                          })}
+                                  : "Unknown";
+                                return (
+                                  <tr key={e.id}>
+                                    <td
+                                      style={{
+                                        textAlign: "center",
+                                        fontSize: "12px",
+                                        color: "var(--ink-faint)",
+                                      }}
+                                    >
+                                      {idx + 1}
+                                    </td>
+                                    <td style={{ fontWeight: 500 }}>{dn}</td>
+                                    <td
+                                      style={{
+                                        fontFamily: "var(--font-mono)",
+                                        fontSize: "13px",
+                                        color: "var(--ink-muted)",
+                                      }}
+                                    >
+                                      {e.student?.studentId || "—"}
+                                    </td>
+                                    <td>
+                                      <button
+                                        className="btn-delete"
+                                        onClick={() =>
+                                          handleRemoveEnrollment(
+                                            subject.id,
+                                            e.student.id,
+                                          )
+                                        }
+                                      >
+                                        Remove
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
                         </div>
                       </div>
                     );
