@@ -103,24 +103,8 @@ function Sections({ dark, toggleDark }) {
               <div className="section-layout">
                 {/* Section list + inline add form */}
                 <div className="section-list">
-                  <div className="section-label" style={{ marginBottom: "4px" }}>Sections</div>
-                  {allSections.length === 0 ? (
-                    <div style={{ fontSize: "13px", color: "var(--ink-faint)", padding: "12px 0" }}>
-                      No sections yet.
-                    </div>
-                  ) : allSections.map(s => {
-                    const count = studentsBySection[s]?.length || 0;
-                    return (
-                      <div key={s} className={`section-list-item${selected === s ? " selected" : ""}`}
-                        onClick={() => { setSelected(s); setSearch(""); }}>
-                        <div className="s-name">{s}</div>
-                        <div className="s-meta">{count} student{count !== 1 ? "s" : ""}</div>
-                      </div>
-                    );
-                  })}
-
                   {/* Inline add section form */}
-                  <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1px solid var(--border)" }}>
+                  <div style={{ marginBottom: "12px", paddingBottom: "10px", borderBottom: "1px solid var(--border)" }}>
                     <div style={{ fontSize: "11.5px", fontWeight: 700, color: "var(--ink-muted)", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                       Add Section
                     </div>
@@ -141,6 +125,22 @@ function Sections({ dark, toggleDark }) {
                       {addingSection ? "Adding…" : "+ Add"}
                     </button>
                   </div>
+
+                  <div className="section-label" style={{ marginBottom: "4px" }}>Sections</div>
+                  {allSections.length === 0 ? (
+                    <div style={{ fontSize: "13px", color: "var(--ink-faint)", padding: "12px 0" }}>
+                      No sections yet.
+                    </div>
+                  ) : allSections.map(s => {
+                    const count = studentsBySection[s]?.length || 0;
+                    return (
+                      <div key={s} className={`section-list-item${selected === s ? " selected" : ""}`}
+                        onClick={() => { setSelected(s); setSearch(""); }}>
+                        <div className="s-name">{s}</div>
+                        <div className="s-meta">{count} student{count !== 1 ? "s" : ""}</div>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {/* Section detail */}
@@ -160,14 +160,6 @@ function Sections({ dark, toggleDark }) {
                             <div style={{ fontSize: "12.5px", color: "var(--ink-faint)" }}>CPE Department</div>
                           </div>
                           <button className="btn btn-danger btn-sm" onClick={() => handleDeleteSection(selected)}>🗑 Delete</button>
-                        </div>
-                        <div style={{ padding: "14px 20px", display: "flex", alignItems: "center", gap: "8px" }}>
-                          <span style={{ fontSize: "28px", fontWeight: 800, fontFamily: "var(--font-mono)", color: "var(--ink)", lineHeight: 1 }}>
-                            {selectedStudents.length}
-                          </span>
-                          <span style={{ fontSize: "12px", color: "var(--ink-faint)", lineHeight: 1.4 }}>
-                            student{selectedStudents.length !== 1 ? "s" : ""}<br />enrolled
-                          </span>
                         </div>
                       </div>
 
