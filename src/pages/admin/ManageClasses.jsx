@@ -1,18 +1,9 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import Sidebar from "../../components/Sidebar";
 
-const DAYS = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-];
-const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 function fmtTime(t) {
   if (!t) return "";
@@ -26,76 +17,95 @@ function formatDisplayName(surname, firstName, middleInitial) {
   return `${surname.trim().toUpperCase()}, ${firstName.trim()}${mi}`;
 }
 
+function ScheduleRows({ schedules, onChange, onAdd, onRemove }) {
+  return (
+    <div className="form-group">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+        <label className="form-label" style={{ margin: 0 }}>Schedule</label>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onAdd}>+ Add Day</button>
+      </div>
+      {schedules.map((sched, i) => (
+        <div key={i} className="schedule-row">
+          <select
+            className="form-select"
+            value={sched.dayOfWeek}
+            onChange={(e) => onChange(i, "dayOfWeek", e.target.value)}
+          >
+            {DAYS.map((d, idx) => <option key={idx} value={idx}>{d}</option>)}
+          </select>
+          <input
+            type="time"
+            className="form-input"
+            value={sched.startTime}
+            onChange={(e) => onChange(i, "startTime", e.target.value)}
+          />
+          <input
+            type="time"
+            className="form-input"
+            value={sched.endTime}
+            onChange={(e) => onChange(i, "endTime", e.target.value)}
+          />
+          <button
+            type="button"
+            className="btn-icon"
+            disabled={schedules.length === 1}
+            onClick={() => onRemove(i)}
+            style={{ opacity: schedules.length === 1 ? 0.4 : 1 }}
+          >
+            −
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ManageClasses({ dark, toggleDark }) {
   const navigate = useNavigate();
-  const location = useLocation();
 
-  const params = new URLSearchParams(location.search);
-  const tabParam = params.get("tab");
-  const initTab =
-    tabParam === "teachers"
-      ? "teachers"
-      : tabParam === "enroll"
-        ? "enrollments"
-        : "subjects";
+  const [sections, setSections]   = useState([]);
+  const [subjects, setSubjects]   = useState([]);
+  const [teachers, setTeachers]   = useState([]);
 
-  const [activeTab, setActiveTab] = useState(initTab);
-  useEffect(() => {
-    setActiveTab(initTab);
-  }, [tabParam]);
-
-  const [sections, setSections] = useState([]);
-  const [subjects, setSubjects] = useState([]);
-  const [teachers, setTeachers] = useState([]);
-
-  // Subjects tab
-  const [subjectForm, setSubjectForm] = useState({
-    name: "",
-    code: "",
-    description: "",
-  });
-  const [showAddModal, setShowAddModal] = useState(false);
+  // Subject form / modals
+  const [subjectForm, setSubjectForm] = useState({ name: "", code: "", description: "" });
+  const [showAddModal, setShowAddModal]       = useState(false);
   const [editingSubjectId, setEditingSubjectId] = useState(null);
-  const [editForm, setEditForm] = useState(null);
-  const [deletingId, setDeletingId] = useState(null);
-  const [savingId, setSavingId] = useState(null);
+  const [editForm, setEditForm]               = useState(null);
+  const [deletingId, setDeletingId]           = useState(null);
+  const [savingId, setSavingId]               = useState(null);
 
-  // Teachers tab
-  const [selectedSubjectForTeacher, setSelectedSubjectForTeacher] =
-    useState("");
+  // Selected subject (left panel click)
+  const [enrollSubjectId, setEnrollSubjectId] = useState("");
+
+  // Teacher assignment
   const [selectedTeacher, setSelectedTeacher] = useState("");
 
-  // Enrollments tab
-  const [enrollSubjectId, setEnrollSubjectId] = useState("");
-  const [showEnrollModal, setShowEnrollModal] = useState(false);
-  const [enrollModalSection, setEnrollModalSection] = useState("");
+  // Section enrollment modal
+  const [showEnrollModal, setShowEnrollModal]         = useState(false);
+  const [enrollModalSection, setEnrollModalSection]   = useState("");
   const [enrollModalSchedules, setEnrollModalSchedules] = useState([
     { dayOfWeek: 1, startTime: "08:00", endTime: "09:00" },
   ]);
   const [enrollingSection, setEnrollingSection] = useState(false);
-  const [removingSection, setRemovingSection] = useState(null);
+  const [removingSection, setRemovingSection]   = useState(null);
+
+  // Enrolled students collapse
+  const [showStudents, setShowStudents] = useState(false);
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError]     = useState("");
   const [success, setSuccess] = useState("");
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const fetchData = () => {
     fetchSubjects();
     fetchTeachers();
-    api
-      .get("/sections")
-      .then((r) => setSections(r.data))
-      .catch(() => {});
+    api.get("/sections").then((r) => setSections(r.data)).catch(() => {});
   };
   const fetchSubjects = () => {
-    api
-      .get("/subjects")
-      .then((r) => setSubjects(r.data))
-      .catch(() => {});
+    api.get("/subjects").then((r) => setSubjects(r.data)).catch(() => {});
   };
   const fetchTeachers = () => {
     api
@@ -111,9 +121,8 @@ function ManageClasses({ dark, toggleDark }) {
     navigate("/");
   };
 
-  // ── Subject form helpers ────────────────────────────────────────
-  const resetForm = () =>
-    setSubjectForm({ name: "", code: "", description: "" });
+  // ── Subject form helpers ──────────────────────────────────────────
+  const resetForm = () => setSubjectForm({ name: "", code: "", description: "" });
   const handleSubjectChange = (e) => {
     const { name, value } = e.target;
     setSubjectForm((p) => ({ ...p, [name]: value }));
@@ -139,14 +148,10 @@ function ManageClasses({ dark, toggleDark }) {
       });
   };
 
-  // ── Edit helpers ────────────────────────────────────────────────
+  // ── Edit helpers ──────────────────────────────────────────────────
   const handleStartEdit = (subject) => {
     setEditingSubjectId(subject.id);
-    setEditForm({
-      name: subject.name,
-      code: subject.code,
-      description: subject.description || "",
-    });
+    setEditForm({ name: subject.name, code: subject.code, description: subject.description || "" });
     setError("");
     setSuccess("");
   };
@@ -158,7 +163,6 @@ function ManageClasses({ dark, toggleDark }) {
     const { name, value } = e.target;
     setEditForm((p) => ({ ...p, [name]: value }));
   };
-
   const handleSaveEdit = (subjectId) => {
     if (!editForm.name.trim() || !editForm.code.trim()) {
       setError("Name and code required.");
@@ -174,9 +178,7 @@ function ManageClasses({ dark, toggleDark }) {
         description: editForm.description.trim(),
       })
       .then((res) => {
-        setSubjects((p) =>
-          p.map((s) => (s.id === subjectId ? res.data.subject : s)),
-        );
+        setSubjects((p) => p.map((s) => (s.id === subjectId ? res.data.subject : s)));
         setSuccess(`"${res.data.subject.name}" updated.`);
         handleCancelEdit();
         setSavingId(null);
@@ -204,9 +206,10 @@ function ManageClasses({ dark, toggleDark }) {
       .then(() => {
         setSubjects((p) => p.filter((s) => s.id !== subjectId));
         setSuccess(`"${subjectName}" deleted.`);
-        if (enrollSubjectId === String(subjectId)) setEnrollSubjectId("");
-        if (selectedSubjectForTeacher === String(subjectId))
-          setSelectedSubjectForTeacher("");
+        if (enrollSubjectId === String(subjectId)) {
+          setEnrollSubjectId("");
+          setShowStudents(false);
+        }
         if (editingSubjectId === subjectId) handleCancelEdit();
         setDeletingId(null);
       })
@@ -220,17 +223,17 @@ function ManageClasses({ dark, toggleDark }) {
       });
   };
 
-  // ── Teachers ────────────────────────────────────────────────────
+  // ── Teachers ──────────────────────────────────────────────────────
   const handleAssignTeacher = () => {
-    if (!selectedSubjectForTeacher || !selectedTeacher) {
-      setError("Select both a subject and a teacher.");
+    if (!enrollSubjectId || !selectedTeacher) {
+      setError("Select a teacher to assign.");
       return;
     }
     setError("");
     setSuccess("");
     api
       .post("/subjects/assign-teacher", {
-        subjectId: parseInt(selectedSubjectForTeacher),
+        subjectId: parseInt(enrollSubjectId),
         teacherId: parseInt(selectedTeacher),
       })
       .then(() => {
@@ -252,7 +255,7 @@ function ManageClasses({ dark, toggleDark }) {
       .catch(() => setError("Failed."));
   };
 
-  // ── Enrollments ─────────────────────────────────────────────────
+  // ── Enrollments ───────────────────────────────────────────────────
   const handleEnrollSectionWithSchedule = () => {
     if (!enrollSubjectId || !enrollModalSection) {
       setError("Select a section.");
@@ -321,10 +324,9 @@ function ManageClasses({ dark, toggleDark }) {
       .catch(() => setError("Failed."));
   };
 
-  // Derive enrolled sections from selected subject's schedules
-  const enrolledSubject = subjects.find(
-    (s) => s.id === parseInt(enrollSubjectId),
-  );
+  // ── Derived values ────────────────────────────────────────────────
+  const enrolledSubject = subjects.find((s) => s.id === parseInt(enrollSubjectId));
+
   const enrolledSections = (() => {
     if (!enrolledSubject) return [];
     const sectionMap = {};
@@ -345,204 +347,16 @@ function ManageClasses({ dark, toggleDark }) {
     (sec) => !enrolledSections.find((es) => es.section === sec),
   );
 
-  // ── Subject card helper ─────────────────────────────────────────
-  const SubjectCard = ({ subject }) => {
-    const teacherName =
-      subject.teachers.length > 0
-        ? subject.teachers.map((t) => t.teacher.name).join(", ")
-        : "Unassigned";
-
-    // Group schedules by section for display
-    const sectionSchedules = {};
-    subject.schedules.forEach((s) => {
-      const key = s.section || "(no section)";
-      if (!sectionSchedules[key]) sectionSchedules[key] = [];
-      sectionSchedules[key].push(s);
-    });
-
-    return (
-      <div className="subject-card">
-        <div className="subject-card-inner">
-          <div
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              justifyContent: "space-between",
-              marginBottom: "10px",
-            }}
-          >
-            <span className="subject-code">{subject.code}</span>
-            <div style={{ display: "flex", gap: "6px" }}>
-              <button
-                className="btn-icon"
-                onClick={() => handleStartEdit(subject)}
-                title="Edit"
-              >
-                ✏️
-              </button>
-              <button
-                className="btn-icon"
-                style={{
-                  background: "var(--red-bg)",
-                  borderColor: "var(--red-border)",
-                  color: "var(--red)",
-                }}
-                disabled={deletingId === subject.id}
-                onClick={(e) =>
-                  handleDeleteSubject(e, subject.id, subject.name)
-                }
-                title="Delete"
-              >
-                {deletingId === subject.id ? "…" : "×"}
-              </button>
-            </div>
-          </div>
-          <div className="subject-name" style={{ marginBottom: "6px" }}>
-            {subject.name}
-          </div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              marginBottom: "12px",
-            }}
-          >
-            <span style={{ fontSize: "11px" }}>👨‍🏫</span>
-            <span style={{ fontSize: "12.5px", color: "var(--ink-muted)" }}>
-              {teacherName}
-            </span>
-          </div>
-          <div className="subject-schedule-block">
-            <div className="subject-schedule-label">Sections</div>
-            {subject.schedules.length === 0 ? (
-              <span style={{ fontSize: "12px", color: "var(--ink-faint)" }}>
-                No sections enrolled yet
-              </span>
-            ) : (
-              Object.entries(sectionSchedules).map(([sec, scheds]) => (
-                <div key={sec} style={{ marginBottom: "6px" }}>
-                  <span
-                    style={{
-                      display: "inline-block",
-                      padding: "1px 6px",
-                      background: "var(--sky-4)",
-                      color: "var(--sky-dark)",
-                      borderRadius: "4px",
-                      fontSize: "10px",
-                      fontWeight: 700,
-                      fontFamily: "var(--font-mono)",
-                      border: "1px solid rgba(14,165,233,.2)",
-                      marginBottom: "3px",
-                    }}
-                  >
-                    {sec}
-                  </span>
-                  {scheds.map((s, i) => (
-                    <div key={i} className="subject-sched-row">
-                      <span className="subject-day-pill">
-                        {DAY_SHORT[s.dayOfWeek]}
-                      </span>
-                      <span
-                        style={{
-                          fontSize: "12px",
-                          color: "var(--ink-muted)",
-                          fontFamily: "var(--font-mono)",
-                        }}
-                      >
-                        {fmtTime(s.startTime)}–{fmtTime(s.endTime)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ))
-            )}
-          </div>
-          <div style={{ marginTop: "12px" }}>
-            <span className="badge badge-neutral">
-              {subject.enrollments.length} students
-            </span>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // ── Schedule form rows (reusable) ───────────────────────────────
-  const ScheduleRows = ({ schedules, onChange, onAdd, onRemove }) => (
-    <div className="form-group">
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: "8px",
-        }}
-      >
-        <label className="form-label" style={{ margin: 0 }}>
-          Schedule
-        </label>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={onAdd}>
-          + Add Day
-        </button>
-      </div>
-      {schedules.map((sched, i) => (
-        <div key={i} className="schedule-row">
-          <select
-            className="form-select"
-            value={sched.dayOfWeek}
-            onChange={(e) => onChange(i, "dayOfWeek", e.target.value)}
-          >
-            {DAYS.map((d, idx) => (
-              <option key={idx} value={idx}>
-                {d}
-              </option>
-            ))}
-          </select>
-          <input
-            type="time"
-            className="form-input"
-            value={sched.startTime}
-            onChange={(e) => onChange(i, "startTime", e.target.value)}
-          />
-          <input
-            type="time"
-            className="form-input"
-            value={sched.endTime}
-            onChange={(e) => onChange(i, "endTime", e.target.value)}
-          />
-          <button
-            type="button"
-            className="btn-icon"
-            disabled={schedules.length === 1}
-            onClick={() => onRemove(i)}
-            style={{ opacity: schedules.length === 1 ? 0.4 : 1 }}
-          >
-            −
-          </button>
-        </div>
-      ))}
-    </div>
-  );
-
   return (
     <div className="dashboard">
-      <Sidebar
-        role="ADMIN"
-        dark={dark}
-        onToggleDark={toggleDark}
-        onLogout={handleLogout}
-      />
+      <Sidebar role="ADMIN" dark={dark} onToggleDark={toggleDark} onLogout={handleLogout} />
 
       <div className="main-area">
         <div className="topbar">
           <span className="tb-title">Manage Classes</span>
           <span className="tb-date">
             {new Date().toLocaleDateString("en-PH", {
-              weekday: "short",
-              year: "numeric",
-              month: "short",
-              day: "numeric",
+              weekday: "short", year: "numeric", month: "short", day: "numeric",
             })}
           </span>
         </div>
@@ -555,264 +369,142 @@ function ManageClasses({ dark, toggleDark }) {
             </div>
           </div>
 
-          {error && <div className="alert alert-error">{error}</div>}
+          {error   && <div className="alert alert-error">{error}</div>}
           {success && <div className="alert alert-success">{success}</div>}
 
-          <div className="tab-navigation">
-            <button
-              className={`tab-btn${activeTab === "subjects" ? " active" : ""}`}
-              onClick={() => setActiveTab("subjects")}
-            >
-              Subjects
-            </button>
-            <button
-              className={`tab-btn${activeTab === "teachers" ? " active" : ""}`}
-              onClick={() => setActiveTab("teachers")}
-            >
-              Assign Teachers
-            </button>
-            <button
-              className={`tab-btn${activeTab === "enrollments" ? " active" : ""}`}
-              onClick={() => setActiveTab("enrollments")}
-            >
-              Enrollment
-            </button>
-          </div>
+          <div className="subject-split-layout">
 
-          {/* ── SUBJECTS TAB ── */}
-          {activeTab === "subjects" && (
-            <div className="tab-content">
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  marginBottom: "16px",
-                }}
-              >
+            {/* ── Left: Subject list ── */}
+            <div className="subject-list-panel">
+              <div className="subject-list-panel-header">
                 <button
-                  className="btn btn-primary"
-                  onClick={() => {
-                    resetForm();
-                    setShowAddModal(true);
-                  }}
+                  className="btn btn-primary btn-sm"
+                  style={{ width: "100%" }}
+                  onClick={() => { resetForm(); setShowAddModal(true); }}
                 >
                   + New Subject
                 </button>
               </div>
+
               {subjects.length === 0 ? (
-                <div className="empty-state">
-                  <h3>No subjects yet</h3>
-                  <p>Create one to get started.</p>
+                <div style={{ padding: "24px 14px", textAlign: "center", color: "var(--ink-faint)", fontSize: "13px" }}>
+                  No subjects yet.
                 </div>
               ) : (
-                <div className="subjects-grid">
-                  {subjects.map((s) => (
-                    <SubjectCard key={s.id} subject={s} />
-                  ))}
-                </div>
+                subjects.map((s) => (
+                  <div
+                    key={s.id}
+                    className={`subject-list-item${enrollSubjectId === String(s.id) ? " selected" : ""}`}
+                    onClick={() => {
+                      setEnrollSubjectId(String(s.id));
+                      setShowStudents(false);
+                      setSelectedTeacher("");
+                      setError("");
+                      setSuccess("");
+                    }}
+                  >
+                    <div className="slitem-code">{s.code}</div>
+                    <div className="slitem-name">{s.name}</div>
+                  </div>
+                ))
               )}
             </div>
-          )}
 
-          {/* ── TEACHERS TAB ── */}
-          {activeTab === "teachers" && (
-            <div className="tab-content">
-              <div className="management-section">
-                <p className="section-title">Assign Teacher to Subject</p>
-                <p className="section-subtitle">
-                  A teacher must be assigned before they can see the subject on
-                  their dashboard.
-                </p>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label">Subject</label>
-                    <select
-                      className="form-select"
-                      value={selectedSubjectForTeacher}
-                      onChange={(e) =>
-                        setSelectedSubjectForTeacher(e.target.value)
-                      }
-                    >
-                      <option value="">— Choose subject —</option>
-                      {subjects.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name} ({s.code})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Teacher</label>
-                    <select
-                      className="form-select"
-                      value={selectedTeacher}
-                      onChange={(e) => setSelectedTeacher(e.target.value)}
-                    >
-                      <option value="">— Choose teacher —</option>
-                      {teachers.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+            {/* ── Right: Subject detail ── */}
+            <div className="subject-detail-panel">
+              {!enrollSubjectId || !enrolledSubject ? (
+                <div className="empty-state">
+                  <p>Select a subject from the list to manage it.</p>
                 </div>
-                <button
-                  className="btn btn-primary"
-                  style={{ maxWidth: "180px" }}
-                  onClick={handleAssignTeacher}
-                >
-                  Assign Teacher
-                </button>
-              </div>
-
-              <div className="management-section">
-                <p className="section-title">Current Assignments</p>
-                {subjects.every((s) => s.teachers.length === 0) ? (
-                  <div className="empty-state" style={{ padding: "32px 0" }}>
-                    <p>No teacher assignments yet.</p>
-                  </div>
-                ) : (
-                  <div className="table-container">
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          <th>Subject</th>
-                          <th>Code</th>
-                          <th>Sections</th>
-                          <th>Teacher</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {subjects.map((subject) =>
-                          subject.teachers.map((st) => (
-                            <tr key={`${subject.id}-${st.teacher.id}`}>
-                              <td style={{ fontWeight: 500 }}>
-                                {subject.name}
-                              </td>
-                              <td>
-                                <span className="subject-code">
-                                  {subject.code}
-                                </span>
-                              </td>
-                              <td
-                                style={{
-                                  fontSize: "13px",
-                                  color: "var(--ink-muted)",
-                                }}
-                              >
-                                {subject.schedules.length === 0 ? (
-                                  <span style={{ color: "var(--ink-faint)" }}>
-                                    No sections enrolled
-                                  </span>
-                                ) : (
-                                  [
-                                    ...new Set(
-                                      subject.schedules.map((s) => s.section),
-                                    ),
-                                  ].map((sec, i) => (
-                                    <span
-                                      key={i}
-                                      style={{
-                                        display: "inline-block",
-                                        padding: "1px 6px",
-                                        background: "var(--sky-4)",
-                                        color: "var(--sky-dark)",
-                                        borderRadius: "4px",
-                                        fontSize: "11px",
-                                        fontWeight: 700,
-                                        fontFamily: "var(--font-mono)",
-                                        border: "1px solid rgba(14,165,233,.2)",
-                                        marginRight: "4px",
-                                      }}
-                                    >
-                                      {sec}
-                                    </span>
-                                  ))
-                                )}
-                              </td>
-                              <td>{st.teacher.name}</td>
-                              <td>
-                                <button
-                                  className="btn-delete"
-                                  onClick={() =>
-                                    handleRemoveTeacher(
-                                      subject.id,
-                                      st.teacher.id,
-                                    )
-                                  }
-                                >
-                                  Remove
-                                </button>
-                              </td>
-                            </tr>
-                          )),
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* ── ENROLLMENTS TAB ── */}
-          {activeTab === "enrollments" && (
-            <div className="tab-content">
-              <div className="management-section">
-                <p className="section-title">Section & Schedule Enrollment</p>
-                <p className="section-subtitle">
-                  Select a subject, then enroll sections with their specific
-                  schedules. Each section can have its own class time.
-                </p>
-                <div className="form-group" style={{ maxWidth: "400px" }}>
-                  <label className="form-label">Select Subject</label>
-                  <select
-                    className="form-select"
-                    value={enrollSubjectId}
-                    onChange={(e) => setEnrollSubjectId(e.target.value)}
-                  >
-                    <option value="">— Choose —</option>
-                    {subjects.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({s.code})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {enrollSubjectId && (
-                  <div>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        marginBottom: "12px",
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: 700,
-                          color: "var(--ink)",
-                        }}
+              ) : (
+                <>
+                  {/* Header */}
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "22px" }}>
+                    <div>
+                      <div style={{ marginBottom: "6px" }}>
+                        <span className="subject-code">{enrolledSubject.code}</span>
+                      </div>
+                      <h2 style={{ fontSize: "18px", fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.02em", margin: "0 0 4px" }}>
+                        {enrolledSubject.name}
+                      </h2>
+                      {enrolledSubject.description && (
+                        <p style={{ fontSize: "13px", color: "var(--ink-faint)", margin: 0 }}>
+                          {enrolledSubject.description}
+                        </p>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", gap: "8px", flexShrink: 0, marginLeft: "16px" }}>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => handleStartEdit(enrolledSubject)}
                       >
-                        Enrolled Sections
-                      </span>
+                        Edit
+                      </button>
+                      <button
+                        className="btn btn-danger btn-sm"
+                        disabled={deletingId === enrolledSubject.id}
+                        onClick={(e) => handleDeleteSubject(e, enrolledSubject.id, enrolledSubject.name)}
+                      >
+                        {deletingId === enrolledSubject.id ? "Deleting…" : "Delete"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* ── Teacher ── */}
+                  <div className="management-section">
+                    <p className="section-title" style={{ marginBottom: "12px" }}>Teacher</p>
+                    {enrolledSubject.teachers.length > 0 ? (
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                          <span style={{ fontSize: "13px" }}>👨‍🏫</span>
+                          <span style={{ fontSize: "14px", fontWeight: 500, color: "var(--ink)" }}>
+                            {enrolledSubject.teachers[0].teacher.name}
+                          </span>
+                        </div>
+                        <button
+                          className="btn-delete"
+                          onClick={() =>
+                            handleRemoveTeacher(enrolledSubject.id, enrolledSubject.teachers[0].teacher.id)
+                          }
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <p style={{ fontSize: "13px", color: "var(--ink-faint)", marginBottom: "10px" }}>
+                          No teacher assigned yet.
+                        </p>
+                        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                          <select
+                            className="form-select"
+                            style={{ maxWidth: "300px" }}
+                            value={selectedTeacher}
+                            onChange={(e) => setSelectedTeacher(e.target.value)}
+                          >
+                            <option value="">— Select teacher —</option>
+                            {teachers.map((t) => (
+                              <option key={t.id} value={t.id}>{t.name}</option>
+                            ))}
+                          </select>
+                          <button className="btn btn-primary btn-sm" onClick={handleAssignTeacher}>
+                            Assign
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* ── Sections & Schedules ── */}
+                  <div className="management-section">
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                      <p className="section-title" style={{ margin: 0 }}>Sections & Schedules</p>
                       <button
                         className="btn btn-primary btn-sm"
                         disabled={availableSections.length === 0}
                         onClick={() => {
                           setEnrollModalSection("");
-                          setEnrollModalSchedules([
-                            {
-                              dayOfWeek: 1,
-                              startTime: "08:00",
-                              endTime: "09:00",
-                            },
-                          ]);
+                          setEnrollModalSchedules([{ dayOfWeek: 1, startTime: "08:00", endTime: "09:00" }]);
                           setShowEnrollModal(true);
                         }}
                       >
@@ -821,18 +513,15 @@ function ManageClasses({ dark, toggleDark }) {
                     </div>
 
                     {enrolledSections.length === 0 ? (
-                      <div
-                        style={{
-                          padding: "32px",
-                          textAlign: "center",
-                          color: "var(--ink-faint)",
-                          background: "var(--surface2)",
-                          borderRadius: "8px",
-                          border: "1px dashed var(--border)",
-                        }}
-                      >
-                        No sections enrolled yet. Click{" "}
-                        <strong>+ Add Section</strong> to get started.
+                      <div style={{
+                        padding: "24px",
+                        textAlign: "center",
+                        color: "var(--ink-faint)",
+                        background: "var(--surface2)",
+                        borderRadius: "8px",
+                        border: "1px dashed var(--border)",
+                      }}>
+                        No sections enrolled yet. Click <strong>+ Add Section</strong> to get started.
                       </div>
                     ) : (
                       <div className="table-container">
@@ -841,115 +530,89 @@ function ManageClasses({ dark, toggleDark }) {
                             <tr>
                               <th>Section</th>
                               <th>Schedule</th>
-                              <th>Students</th>
-                              <th>Actions</th>
+                              <th style={{ textAlign: "center" }}>Students</th>
+                              <th>Action</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {enrolledSections.map(
-                              ({ section, schedules, enrolledCount }) => (
-                                <tr key={section}>
-                                  <td>
-                                    <span
-                                      style={{
-                                        display: "inline-block",
-                                        padding: "2px 8px",
-                                        background: "var(--sky-4)",
-                                        color: "var(--sky-dark)",
-                                        borderRadius: "5px",
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        fontFamily: "var(--font-mono)",
-                                        border: "1px solid rgba(14,165,233,.2)",
-                                      }}
-                                    >
-                                      {section}
-                                    </span>
-                                  </td>
-                                  <td
-                                    style={{
-                                      fontSize: "13px",
-                                      color: "var(--ink-muted)",
-                                    }}
+                            {enrolledSections.map(({ section, schedules, enrolledCount }) => (
+                              <tr key={section}>
+                                <td>
+                                  <span style={{
+                                    display: "inline-block",
+                                    padding: "2px 8px",
+                                    background: "var(--sky-4)",
+                                    color: "var(--sky-dark)",
+                                    borderRadius: "5px",
+                                    fontSize: "12px",
+                                    fontWeight: 700,
+                                    fontFamily: "var(--font-mono)",
+                                    border: "1px solid rgba(14,165,233,.2)",
+                                  }}>
+                                    {section}
+                                  </span>
+                                </td>
+                                <td style={{ fontSize: "13px", color: "var(--ink-muted)" }}>
+                                  {schedules.map((s, i) => (
+                                    <div key={i}>
+                                      {DAYS[s.dayOfWeek]} {fmtTime(s.startTime)}–{fmtTime(s.endTime)}
+                                    </div>
+                                  ))}
+                                </td>
+                                <td style={{ textAlign: "center", fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--ink-muted)" }}>
+                                  {enrolledCount}
+                                </td>
+                                <td>
+                                  <button
+                                    className="btn-delete"
+                                    disabled={removingSection === section}
+                                    onClick={() => handleRemoveSection(section)}
                                   >
-                                    {schedules.map((s, i) => (
-                                      <div key={i}>
-                                        {DAYS[s.dayOfWeek]}{" "}
-                                        {fmtTime(s.startTime)}–
-                                        {fmtTime(s.endTime)}
-                                      </div>
-                                    ))}
-                                  </td>
-                                  <td
-                                    style={{
-                                      textAlign: "center",
-                                      fontFamily: "var(--font-mono)",
-                                      fontWeight: 600,
-                                      color: "var(--ink-muted)",
-                                    }}
-                                  >
-                                    {enrolledCount}
-                                  </td>
-                                  <td>
-                                    <button
-                                      className="btn-delete"
-                                      disabled={removingSection === section}
-                                      onClick={() =>
-                                        handleRemoveSection(section)
-                                      }
-                                    >
-                                      {removingSection === section
-                                        ? "Removing…"
-                                        : "Remove"}
-                                    </button>
-                                  </td>
-                                </tr>
-                              ),
-                            )}
+                                    {removingSection === section ? "Removing…" : "Remove"}
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
                           </tbody>
                         </table>
                       </div>
                     )}
                   </div>
-                )}
-              </div>
 
-              {/* Current enrollments by subject */}
-              <div className="management-section">
-                <p className="section-title">All Enrollments</p>
-                {subjects.every((s) => s.enrollments.length === 0) ? (
-                  <div className="empty-state" style={{ padding: "32px 0" }}>
-                    <p>No enrollments yet.</p>
-                  </div>
-                ) : (
-                  subjects.map((subject) => {
-                    if (subject.enrollments.length === 0) return null;
-                    return (
-                      <div key={subject.id} className="enrollment-card">
-                        <h3>
-                          {subject.name}
-                          <span
-                            style={{
-                              fontWeight: 400,
-                              fontSize: "12px",
-                              color: "var(--ink-faint)",
-                              marginLeft: "6px",
-                            }}
-                          >
-                            ({subject.code})
-                          </span>
-                          <span
-                            style={{
-                              fontWeight: 400,
-                              fontSize: "12px",
-                              color: "var(--ink-muted)",
-                              marginLeft: "8px",
-                            }}
-                          >
-                            — {subject.enrollments.length} student
-                            {subject.enrollments.length !== 1 ? "s" : ""}
-                          </span>
-                        </h3>
+                  {/* ── Enrolled Students (collapsible) ── */}
+                  <div className="management-section">
+                    <button
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        width: "100%",
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        padding: 0,
+                        textAlign: "left",
+                      }}
+                      onClick={() => setShowStudents((p) => !p)}
+                    >
+                      <span className="section-title" style={{ margin: 0 }}>
+                        Enrolled Students
+                        <span style={{ fontWeight: 400, fontSize: "12px", color: "var(--ink-faint)", marginLeft: "8px" }}>
+                          — {enrolledSubject.enrollments.length} student
+                          {enrolledSubject.enrollments.length !== 1 ? "s" : ""}
+                        </span>
+                      </span>
+                      <span style={{ fontSize: "12px", color: "var(--sky)", fontWeight: 600 }}>
+                        {showStudents ? "Hide" : "Show"}
+                      </span>
+                    </button>
+
+                    {showStudents && (
+                      enrolledSubject.enrollments.length === 0 ? (
+                        <p style={{ marginTop: "12px", fontSize: "13px", color: "var(--ink-faint)" }}>
+                          No students enrolled yet.
+                        </p>
+                      ) : (
                         <div className="table-container" style={{ marginTop: "12px" }}>
                           <table className="data-table">
                             <thead>
@@ -961,7 +624,7 @@ function ManageClasses({ dark, toggleDark }) {
                               </tr>
                             </thead>
                             <tbody>
-                              {subject.enrollments.map((e, idx) => {
+                              {enrolledSubject.enrollments.map((e, idx) => {
                                 const dn = e.student
                                   ? formatDisplayName(
                                       e.student.surname,
@@ -971,34 +634,18 @@ function ManageClasses({ dark, toggleDark }) {
                                   : "Unknown";
                                 return (
                                   <tr key={e.id}>
-                                    <td
-                                      style={{
-                                        textAlign: "center",
-                                        fontSize: "12px",
-                                        color: "var(--ink-faint)",
-                                      }}
-                                    >
+                                    <td style={{ textAlign: "center", fontSize: "12px", color: "var(--ink-faint)" }}>
                                       {idx + 1}
                                     </td>
                                     <td style={{ fontWeight: 500 }}>{dn}</td>
-                                    <td
-                                      style={{
-                                        fontFamily: "var(--font-mono)",
-                                        fontSize: "13px",
-                                        color: "var(--ink-muted)",
-                                      }}
-                                    >
+                                    <td style={{ fontFamily: "var(--font-mono)", fontSize: "13px", color: "var(--ink-muted)" }}>
                                       {e.student?.studentId || "—"}
                                     </td>
                                     <td>
                                       <button
                                         className="btn-delete"
-                                        onClick={() =>
-                                          handleRemoveEnrollment(
-                                            subject.id,
-                                            e.student.id,
-                                          )
-                                        }
+                                        disabled={!e.student}
+                                        onClick={() => handleRemoveEnrollment(enrolledSubject.id, e.student?.id)}
                                       >
                                         Remove
                                       </button>
@@ -1009,42 +656,27 @@ function ManageClasses({ dark, toggleDark }) {
                             </tbody>
                           </table>
                         </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
+                      )
+                    )}
+                  </div>
+                </>
+              )}
             </div>
-          )}
+          </div>
         </main>
       </div>
 
       {/* ── Add Subject Modal ── */}
       {showAddModal && (
         <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
-          <div
-            className="modal-box"
-            style={{ width: "480px" }}
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="modal-box" style={{ width: "480px" }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>Add New Subject</h2>
-              <button
-                className="modal-close"
-                onClick={() => setShowAddModal(false)}
-              >
-                ×
-              </button>
+              <button className="modal-close" onClick={() => setShowAddModal(false)}>×</button>
             </div>
             <div className="modal-body">
               <form onSubmit={handleSubjectSubmit}>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "130px 1fr",
-                    gap: "12px",
-                  }}
-                >
+                <div style={{ display: "grid", gridTemplateColumns: "130px 1fr", gap: "12px" }}>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Code</label>
                     <input
@@ -1079,28 +711,13 @@ function ManageClasses({ dark, toggleDark }) {
                   />
                 </div>
                 <p className="form-help" style={{ marginBottom: "12px" }}>
-                  Schedules are assigned per section in the Enrollment tab.
+                  Sections and schedules are added from the detail panel after creation.
                 </p>
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "10px",
-                    justifyContent: "flex-end",
-                    marginTop: "4px",
-                  }}
-                >
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => setShowAddModal(false)}
-                  >
+                <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "4px" }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>
                     Cancel
                   </button>
-                  <button
-                    type="submit"
-                    className="btn btn-primary"
-                    disabled={loading}
-                  >
+                  <button type="submit" className="btn btn-primary" disabled={loading}>
                     {loading ? "Creating…" : "Create Subject"}
                   </button>
                 </div>
@@ -1113,25 +730,13 @@ function ManageClasses({ dark, toggleDark }) {
       {/* ── Edit Subject Modal ── */}
       {editingSubjectId && editForm && (
         <div className="modal-overlay" onClick={handleCancelEdit}>
-          <div
-            className="modal-box"
-            style={{ width: "480px" }}
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="modal-box" style={{ width: "480px" }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>Edit Subject</h2>
-              <button className="modal-close" onClick={handleCancelEdit}>
-                ×
-              </button>
+              <button className="modal-close" onClick={handleCancelEdit}>×</button>
             </div>
             <div className="modal-body">
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "130px 1fr",
-                  gap: "12px",
-                }}
-              >
+              <div style={{ display: "grid", gridTemplateColumns: "130px 1fr", gap: "12px" }}>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">Code</label>
                   <input
@@ -1164,23 +769,8 @@ function ManageClasses({ dark, toggleDark }) {
                   onChange={handleEditChange}
                 />
               </div>
-              <p className="form-help" style={{ marginBottom: "12px" }}>
-                To manage schedules, use the Enrollment tab.
-              </p>
-              <div
-                style={{
-                  display: "flex",
-                  gap: "10px",
-                  justifyContent: "flex-end",
-                  marginTop: "4px",
-                }}
-              >
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={handleCancelEdit}
-                  disabled={savingId !== null}
-                >
+              <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "4px" }}>
+                <button type="button" className="btn btn-secondary" onClick={handleCancelEdit} disabled={savingId !== null}>
                   Cancel
                 </button>
                 <button
@@ -1199,23 +789,11 @@ function ManageClasses({ dark, toggleDark }) {
 
       {/* ── Add Section & Schedule Modal ── */}
       {showEnrollModal && (
-        <div
-          className="modal-overlay"
-          onClick={() => setShowEnrollModal(false)}
-        >
-          <div
-            className="modal-box"
-            style={{ width: "480px" }}
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div className="modal-overlay" onClick={() => setShowEnrollModal(false)}>
+          <div className="modal-box" style={{ width: "480px" }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>Add Section & Schedule</h2>
-              <button
-                className="modal-close"
-                onClick={() => setShowEnrollModal(false)}
-              >
-                ×
-              </button>
+              <button className="modal-close" onClick={() => setShowEnrollModal(false)}>×</button>
             </div>
             <div className="modal-body">
               <div className="form-group">
@@ -1227,15 +805,11 @@ function ManageClasses({ dark, toggleDark }) {
                 >
                   <option value="">— Choose section —</option>
                   {availableSections.map((sec) => (
-                    <option key={sec} value={sec}>
-                      {sec}
-                    </option>
+                    <option key={sec} value={sec}>{sec}</option>
                   ))}
                 </select>
                 {availableSections.length === 0 && (
-                  <p className="form-help">
-                    All sections are already enrolled in this subject.
-                  </p>
+                  <p className="form-help">All sections are already enrolled in this subject.</p>
                 )}
               </div>
               <ScheduleRows
@@ -1245,11 +819,7 @@ function ManageClasses({ dark, toggleDark }) {
                     p.map((s, idx) =>
                       idx !== i
                         ? s
-                        : {
-                            ...s,
-                            [field]:
-                              field === "dayOfWeek" ? parseInt(val) : val,
-                          },
+                        : { ...s, [field]: field === "dayOfWeek" ? parseInt(val) : val },
                     ),
                   )
                 }
@@ -1260,24 +830,11 @@ function ManageClasses({ dark, toggleDark }) {
                   ])
                 }
                 onRemove={(i) =>
-                  setEnrollModalSchedules((p) =>
-                    p.filter((_, idx) => idx !== i),
-                  )
+                  setEnrollModalSchedules((p) => p.filter((_, idx) => idx !== i))
                 }
               />
-              <div
-                style={{
-                  display: "flex",
-                  gap: "10px",
-                  justifyContent: "flex-end",
-                  marginTop: "4px",
-                }}
-              >
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setShowEnrollModal(false)}
-                >
+              <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "4px" }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowEnrollModal(false)}>
                   Cancel
                 </button>
                 <button

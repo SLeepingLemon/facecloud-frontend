@@ -3,18 +3,11 @@ import logoImg from "../../images/logo.png";
 import { useNavigate, useLocation } from "react-router-dom";
 
 const ADMIN_NAV = [
-  { id: "dashboard",  label: "Dashboard", icon: "⊞", path: "/admin/AdminDashboard" },
-  { id: "users",      label: "Users",     icon: "◎", path: "/admin/manage-users"   },
-  {
-    id: "classes", label: "Classes", icon: "◈",
-    children: [
-      { id: "classes-subjects",  label: "Subjects",        path: "/admin/manage-classes?tab=subjects"  },
-      { id: "classes-teachers",  label: "Assign Teachers", path: "/admin/manage-classes?tab=teachers"  },
-      { id: "classes-enroll",    label: "Enrollment",      path: "/admin/manage-classes?tab=enroll"    },
-    ],
-  },
-  { id: "sections", label: "Sections", icon: "⊟", path: "/admin/sections" },
-  { id: "reports",  label: "Reports",  icon: "◫", path: "/admin/reports"  },
+  { id: "dashboard", label: "Dashboard", icon: "⊞", path: "/admin/AdminDashboard" },
+  { id: "users",     label: "Users",     icon: "◎", path: "/admin/manage-users"   },
+  { id: "classes",   label: "Classes",   icon: "◈", path: "/admin/manage-classes" },
+  { id: "sections",  label: "Sections",  icon: "⊟", path: "/admin/sections"       },
+  { id: "reports",   label: "Reports",   icon: "◫", path: "/admin/reports"        },
 ];
 
 const TEACHER_NAV = [
@@ -31,28 +24,19 @@ export default function Sidebar({ role, dark, onToggleDark, onLogout }) {
 
   const [mobileOpen, setMobileOpen] = React.useState(false);
 
-  const path = location.pathname + location.search;
+  const path = location.pathname;
   const getActive = () => {
-    if (path.includes("manage-classes")) {
-      if (path.includes("tab=teachers")) return "classes-teachers";
-      if (path.includes("tab=enroll"))   return "classes-enroll";
-      return "classes-subjects";
-    }
-    if (path.includes("AdminDashboard"))  return "dashboard";
-    if (path.includes("manage-users"))    return "users";
-    if (path.includes("sections"))        return "sections";
-    if (path.includes("reports"))         return "reports";
+    if (path.includes("manage-classes"))   return "classes";
+    if (path.includes("AdminDashboard"))   return "dashboard";
+    if (path.includes("manage-users"))     return "users";
+    if (path.includes("sections"))         return "sections";
+    if (path.includes("reports"))          return "reports";
     if (path.includes("TeacherDashboard")) return "teacher-dashboard";
     return "";
   };
-  const activePage  = getActive();
-  const classesOpen = activePage.startsWith("classes");
+  const activePage = getActive();
 
-  const [classOpen, setClassOpen] = React.useState(classesOpen);
-  React.useEffect(() => { if (classesOpen) setClassOpen(true); }, [classesOpen]);
-
-  const isActive = (id) =>
-    id === "classes" ? activePage.startsWith("classes") : activePage === id;
+  const isActive = (id) => activePage === id;
 
   const goTo = (p) => { navigate(p); setMobileOpen(false); };
 
@@ -99,31 +83,6 @@ export default function Sidebar({ role, dark, onToggleDark, onLogout }) {
         <nav className="sb-nav">
           {nav.map((item) => {
             const active = isActive(item.id);
-            if (item.children) {
-              return (
-                <div key={item.id}>
-                  <button
-                    className={`sb-dd-par${active ? " act" : ""}`}
-                    onClick={() => setClassOpen((o) => !o)}
-                  >
-                    <span className="sb-icon" style={{ opacity: 0.55, fontSize: "13px" }}>{item.icon}</span>
-                    <span style={{ flex: 1 }}>{item.label}</span>
-                    <span className={`sb-chev${classOpen ? " open" : ""}`}>▶</span>
-                  </button>
-                  <div className={`sb-kids${classOpen ? " open" : ""}`}>
-                    {item.children.map((child) => (
-                      <button
-                        key={child.id}
-                        className={`sb-kid${activePage === child.id ? " act" : ""}`}
-                        onClick={() => goTo(child.path)}
-                      >
-                        {child.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              );
-            }
             return (
               <button
                 key={item.id}

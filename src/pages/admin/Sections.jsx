@@ -16,7 +16,6 @@ function Sections({ dark, toggleDark }) {
   const [sections,      setSections]      = useState([]);
   const [loading,       setLoading]       = useState(true);
   const [selected,      setSelected]      = useState(null);   // currently selected section name
-  const [filter,        setFilter]        = useState("all");  // pill filter
   const [search,        setSearch]        = useState("");
   const [newSection,    setNewSection]    = useState("");
   const [addingSection, setAddingSection] = useState(false);
@@ -67,8 +66,6 @@ function Sections({ dark, toggleDark }) {
   const activeSections = Object.keys(studentsBySection).sort();
   const allSections = [...sections, ...activeSections.filter(s => !sections.includes(s))].sort();
 
-  const filteredSections = filter === "all" ? allSections : allSections.filter(s => s === filter);
-
   const selectedStudents = selected ? (studentsBySection[selected] || []).slice().sort((a, b) => a.surname.localeCompare(b.surname)) : [];
   const filteredStudents = selectedStudents.filter(s =>
     formatDisplayName(s.surname, s.firstName, s.middleInitial).toLowerCase().includes(search.toLowerCase()) ||
@@ -98,51 +95,20 @@ function Sections({ dark, toggleDark }) {
           {sectionError && <div className="alert alert-error">{sectionError}</div>}
           {successMsg   && <div className="alert alert-success">{successMsg}</div>}
 
-          {/* Add new section */}
-          <div className="management-section" style={{ marginBottom: "20px" }}>
-            <p className="section-title">Add New Section</p>
-            <p className="section-subtitle">New sections become available immediately on the Pi registration script.</p>
-            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-              <input
-                className="form-input"
-                style={{ maxWidth: "280px" }}
-                placeholder="e.g. BSCPE 4-3"
-                value={newSection}
-                onChange={e => { setNewSection(e.target.value.toUpperCase()); setSectionError(""); }}
-                onKeyDown={e => e.key === "Enter" && handleAddSection()}
-              />
-              <button className="btn btn-primary" onClick={handleAddSection} disabled={addingSection || !newSection.trim()}>
-                {addingSection ? "Adding…" : "+ Add Section"}
-              </button>
-            </div>
-          </div>
-
           {loading ? (
             <div className="empty-state"><div className="spinner" /><p>Loading…</p></div>
-          ) : allSections.length === 0 ? (
-            <div className="empty-state">
-              <h3>No sections yet</h3>
-              <p>Add a section above to get started.</p>
-            </div>
           ) : (
             <>
-              {/* Filter pills */}
-              <div className="section-filter-pills">
-                <button className={`section-pill${filter === "all" ? " active" : ""}`} onClick={() => setFilter("all")}>All</button>
-                {allSections.map(s => (
-                  <button key={s} className={`section-pill${filter === s ? " active" : ""}`}
-                    onClick={() => { setFilter(s); setSelected(s); setSearch(""); }}>
-                    {s}
-                  </button>
-                ))}
-              </div>
-
               {/* Split layout */}
               <div className="section-layout">
-                {/* Section list */}
+                {/* Section list + inline add form */}
                 <div className="section-list">
                   <div className="section-label" style={{ marginBottom: "4px" }}>Sections</div>
-                  {filteredSections.map(s => {
+                  {allSections.length === 0 ? (
+                    <div style={{ fontSize: "13px", color: "var(--ink-faint)", padding: "12px 0" }}>
+                      No sections yet.
+                    </div>
+                  ) : allSections.map(s => {
                     const count = studentsBySection[s]?.length || 0;
                     return (
                       <div key={s} className={`section-list-item${selected === s ? " selected" : ""}`}
@@ -152,6 +118,29 @@ function Sections({ dark, toggleDark }) {
                       </div>
                     );
                   })}
+
+                  {/* Inline add section form */}
+                  <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1px solid var(--border)" }}>
+                    <div style={{ fontSize: "11.5px", fontWeight: 700, color: "var(--ink-muted)", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                      Add Section
+                    </div>
+                    <input
+                      className="form-input"
+                      style={{ marginBottom: "6px", fontSize: "13px" }}
+                      placeholder="e.g. BSCPE 4-3"
+                      value={newSection}
+                      onChange={e => { setNewSection(e.target.value.toUpperCase()); setSectionError(""); }}
+                      onKeyDown={e => e.key === "Enter" && handleAddSection()}
+                    />
+                    <button
+                      className="btn btn-primary btn-sm"
+                      style={{ width: "100%" }}
+                      onClick={handleAddSection}
+                      disabled={addingSection || !newSection.trim()}
+                    >
+                      {addingSection ? "Adding…" : "+ Add"}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Section detail */}
