@@ -17,45 +17,74 @@ function formatDisplayName(surname, firstName, middleInitial) {
   return `${surname.trim().toUpperCase()}, ${firstName.trim()}${mi}`;
 }
 
+const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
 function ScheduleRows({ schedules, onChange, onAdd, onRemove }) {
   return (
-    <div className="form-group">
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
-        <label className="form-label" style={{ margin: 0 }}>Schedule</label>
+    <div className="form-group" style={{ marginBottom: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+        <div>
+          <label className="form-label" style={{ margin: 0 }}>Schedule</label>
+          <p style={{ fontSize: "12px", color: "var(--ink-faint)", margin: "2px 0 0" }}>
+            Pick a day and set the time window.
+          </p>
+        </div>
         <button type="button" className="btn btn-ghost btn-sm" onClick={onAdd}>+ Add Day</button>
       </div>
-      {schedules.map((sched, i) => (
-        <div key={i} className="schedule-row">
-          <select
-            className="form-select"
-            value={sched.dayOfWeek}
-            onChange={(e) => onChange(i, "dayOfWeek", e.target.value)}
-          >
-            {DAYS.map((d, idx) => <option key={idx} value={idx}>{d}</option>)}
-          </select>
-          <input
-            type="time"
-            className="form-input"
-            value={sched.startTime}
-            onChange={(e) => onChange(i, "startTime", e.target.value)}
-          />
-          <input
-            type="time"
-            className="form-input"
-            value={sched.endTime}
-            onChange={(e) => onChange(i, "endTime", e.target.value)}
-          />
-          <button
-            type="button"
-            className="btn-icon"
-            disabled={schedules.length === 1}
-            onClick={() => onRemove(i)}
-            style={{ opacity: schedules.length === 1 ? 0.4 : 1 }}
-          >
-            −
-          </button>
-        </div>
-      ))}
+
+      <div className="sched-card-list">
+        {schedules.map((sched, i) => (
+          <div key={i} className="sched-card">
+            <div className="sched-card-head">
+              <span className="sched-card-label">Session {i + 1}</span>
+              <button
+                type="button"
+                className="sched-remove-btn"
+                disabled={schedules.length === 1}
+                onClick={() => onRemove(i)}
+                style={{ opacity: schedules.length === 1 ? 0.25 : 1 }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="sched-day-pills">
+              {DAY_LABELS.map((d, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  className={`sched-day-pill${sched.dayOfWeek === idx ? " active" : ""}`}
+                  onClick={() => onChange(i, "dayOfWeek", idx)}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+
+            <div className="sched-time-row">
+              <div className="sched-time-block">
+                <span className="sched-time-lbl">Start</span>
+                <input
+                  type="time"
+                  className="form-input sched-time-input"
+                  value={sched.startTime}
+                  onChange={(e) => onChange(i, "startTime", e.target.value)}
+                />
+              </div>
+              <span className="sched-time-arrow">→</span>
+              <div className="sched-time-block">
+                <span className="sched-time-lbl">End</span>
+                <input
+                  type="time"
+                  className="form-input sched-time-input"
+                  value={sched.endTime}
+                  onChange={(e) => onChange(i, "endTime", e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -790,28 +819,50 @@ function ManageClasses({ dark, toggleDark }) {
       {/* ── Add Section & Schedule Modal ── */}
       {showEnrollModal && (
         <div className="modal-overlay" onClick={() => setShowEnrollModal(false)}>
-          <div className="modal-box" style={{ width: "480px" }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal-box" style={{ width: "500px" }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Add Section & Schedule</h2>
+              <div>
+                <h2 style={{ margin: 0 }}>Add Section & Schedule</h2>
+                <p style={{ margin: "3px 0 0", fontSize: "12px", color: "var(--ink-faint)" }}>
+                  {enrolledSubject?.name}
+                </p>
+              </div>
               <button className="modal-close" onClick={() => setShowEnrollModal(false)}>×</button>
             </div>
             <div className="modal-body">
+
+              {/* ── Section picker ── */}
               <div className="form-group">
                 <label className="form-label">Section</label>
-                <select
-                  className="form-select"
-                  value={enrollModalSection}
-                  onChange={(e) => setEnrollModalSection(e.target.value)}
-                >
-                  <option value="">— Choose section —</option>
-                  {availableSections.map((sec) => (
-                    <option key={sec} value={sec}>{sec}</option>
-                  ))}
-                </select>
-                {availableSections.length === 0 && (
-                  <p className="form-help">All sections are already enrolled in this subject.</p>
+                {availableSections.length === 0 ? (
+                  <div style={{
+                    padding: "14px",
+                    background: "var(--surface2)",
+                    borderRadius: "8px",
+                    border: "1px dashed var(--border)",
+                    textAlign: "center",
+                    fontSize: "13px",
+                    color: "var(--ink-faint)",
+                  }}>
+                    All sections are already enrolled in this subject.
+                  </div>
+                ) : (
+                  <div className="section-picker">
+                    {availableSections.map((sec) => (
+                      <button
+                        key={sec}
+                        type="button"
+                        className={`section-pick-btn${enrollModalSection === sec ? " selected" : ""}`}
+                        onClick={() => setEnrollModalSection(sec)}
+                      >
+                        {sec}
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
+
+              {/* ── Schedule rows ── */}
               <ScheduleRows
                 schedules={enrollModalSchedules}
                 onChange={(i, field, val) =>
@@ -833,7 +884,9 @@ function ManageClasses({ dark, toggleDark }) {
                   setEnrollModalSchedules((p) => p.filter((_, idx) => idx !== i))
                 }
               />
-              <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "4px" }}>
+
+              {/* ── Footer ── */}
+              <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "20px", paddingTop: "16px", borderTop: "1px solid var(--border)" }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowEnrollModal(false)}>
                   Cancel
                 </button>
