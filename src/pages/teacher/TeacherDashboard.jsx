@@ -93,6 +93,7 @@ function TeacherDashboard({ dark, toggleDark }) {
   const [showExportPicker, setShowExportPicker] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [overrideLoading, setOverrideLoading] = useState({});
 
   const sseRef = useRef(null);
   const selectedClassRef = useRef(null);
@@ -377,6 +378,18 @@ function TeacherDashboard({ dark, toggleDark }) {
       .catch(() => {
         setError("Failed to load attendance history.");
         setLoading(false);
+      });
+  };
+
+  const handleOverride = (recordId, newStatus) => {
+    setOverrideLoading((prev) => ({ ...prev, [recordId]: true }));
+    api
+      .put(`/attendance/record/${recordId}`, { status: newStatus })
+      .catch((err) => {
+        setError(err.response?.data?.message || "Failed to override status.");
+      })
+      .finally(() => {
+        setOverrideLoading((prev) => ({ ...prev, [recordId]: false }));
       });
   };
 
@@ -1461,6 +1474,7 @@ function TeacherDashboard({ dark, toggleDark }) {
                       <th>Name</th>
                       <th>Section</th>
                       <th>Status</th>
+                      <th>Override</th>
                       <th>Arrival Time</th>
                       <th>Face Scan</th>
                     </tr>
@@ -1469,7 +1483,7 @@ function TeacherDashboard({ dark, toggleDark }) {
                     {filteredRecords.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={6}
+                          colSpan={7}
                           style={{
                             padding: "32px",
                             textAlign: "center",
@@ -1480,77 +1494,124 @@ function TeacherDashboard({ dark, toggleDark }) {
                         </td>
                       </tr>
                     ) : (
-                      filteredRecords.map((record) => (
-                        <tr key={record.id}>
-                          <td
-                            style={{
-                              fontSize: "11.5px",
-                              color: "var(--ink-faint)",
-                              fontFamily: "var(--font-mono)",
-                            }}
-                          >
-                            {record.student.studentId}
-                          </td>
-                          <td style={{ fontWeight: 600 }}>
-                            {formatDisplayName(
-                              record.student.surname,
-                              record.student.firstName,
-                              record.student.middleInitial,
-                            )}
-                          </td>
-                          <td>
-                            <span
+                      filteredRecords.map((record) => {
+                        const canOverride =
+                          record.status === "PRESENT" ||
+                          record.status === "LATE";
+                        return (
+                          <tr key={record.id}>
+                            <td
                               style={{
-                                display: "inline-block",
-                                padding: "2px 7px",
-                                background: "var(--sky-4)",
-                                color: "var(--sky-dark)",
-                                borderRadius: "5px",
-                                fontSize: "11px",
-                                fontWeight: 700,
+                                fontSize: "11.5px",
+                                color: "var(--ink-faint)",
                                 fontFamily: "var(--font-mono)",
-                                border: "1px solid rgba(14,165,233,.2)",
                               }}
                             >
-                              {record.student.section}
-                            </span>
-                          </td>
-                          <td>
-                            <StatusBadge status={record.status} />
-                          </td>
-                          <td
-                            style={{
-                              color: "var(--ink-faint)",
-                              fontFamily: "var(--font-mono)",
-                              fontSize: "12px",
-                            }}
-                          >
-                            {formatTime(record.arrivalTime)}
-                          </td>
-                          <td>
-                            {record.status !== "PENDING" &&
-                            record.status !== "ABSENT" ? (
+                              {record.student.studentId}
+                            </td>
+                            <td style={{ fontWeight: 600 }}>
+                              {formatDisplayName(
+                                record.student.surname,
+                                record.student.firstName,
+                                record.student.middleInitial,
+                              )}
+                            </td>
+                            <td>
                               <span
                                 style={{
-                                  fontSize: "12px",
-                                  color: "var(--green)",
+                                  display: "inline-block",
+                                  padding: "2px 7px",
+                                  background: "var(--sky-4)",
+                                  color: "var(--sky-dark)",
+                                  borderRadius: "5px",
+                                  fontSize: "11px",
+                                  fontWeight: 700,
+                                  fontFamily: "var(--font-mono)",
+                                  border: "1px solid rgba(14,165,233,.2)",
                                 }}
                               >
-                                ✓ Verified
+                                {record.student.section}
                               </span>
-                            ) : (
-                              <span
-                                style={{
-                                  fontSize: "12px",
-                                  color: "var(--ink-faint)",
-                                }}
-                              >
-                                —
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      ))
+                            </td>
+                            <td>
+                              <StatusBadge status={record.status} />
+                            </td>
+                            <td>
+                              {canOverride ? (
+                                <select
+                                  value={record.status}
+                                  disabled={!!overrideLoading[record.id]}
+                                  onChange={(e) =>
+                                    handleOverride(record.id, e.target.value)
+                                  }
+                                  style={{
+                                    fontSize: "11px",
+                                    fontWeight: 700,
+                                    fontFamily: "var(--font-mono)",
+                                    textTransform: "uppercase",
+                                    letterSpacing: "0.04em",
+                                    padding: "3px 6px",
+                                    borderRadius: "6px",
+                                    border: "1px solid var(--border)",
+                                    background: "var(--surface2)",
+                                    color: "var(--ink)",
+                                    cursor: overrideLoading[record.id]
+                                      ? "wait"
+                                      : "pointer",
+                                    opacity: overrideLoading[record.id]
+                                      ? 0.5
+                                      : 1,
+                                  }}
+                                >
+                                  <option value="PRESENT">PRESENT</option>
+                                  <option value="LATE">LATE</option>
+                                  <option value="ABSENT">ABSENT</option>
+                                </select>
+                              ) : (
+                                <span
+                                  style={{
+                                    fontSize: "12px",
+                                    color: "var(--ink-faint)",
+                                  }}
+                                >
+                                  —
+                                </span>
+                              )}
+                            </td>
+                            <td
+                              style={{
+                                color: "var(--ink-faint)",
+                                fontFamily: "var(--font-mono)",
+                                fontSize: "12px",
+                              }}
+                            >
+                              {formatTime(record.arrivalTime)}
+                            </td>
+                            <td>
+                              {record.status !== "PENDING" &&
+                              record.status !== "ABSENT" ? (
+                                <span
+                                  style={{
+                                    fontSize: "12px",
+                                    color: "var(--green)",
+                                  }}
+                                >
+                                  ✓ Verified
+                                </span>
+                              ) : (
+                                <span
+                                  style={{
+                                    fontSize: "12px",
+                                    color: "var(--ink-faint)",
+                                  }}
+                                >
+                                  —
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
