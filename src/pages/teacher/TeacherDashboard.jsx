@@ -94,6 +94,9 @@ function TeacherDashboard({ dark, toggleDark }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [overrideLoading, setOverrideLoading] = useState({});
+  const [showEndModal, setShowEndModal] = useState(false);
+  const [endNoteText, setEndNoteText] = useState("");
+  const [hoveredSessionId, setHoveredSessionId] = useState(null);
 
   const sseRef = useRef(null);
   const selectedClassRef = useRef(null);
@@ -196,6 +199,7 @@ function TeacherDashboard({ dark, toggleDark }) {
       });
       es.addEventListener("session_ended", () => {
         setCurrentSession(null);
+        setShowEndModal(false);
         setSuccess("Session ended — attendance records saved.");
         closeSSE();
       });
@@ -338,19 +342,13 @@ function TeacherDashboard({ dark, toggleDark }) {
       });
   };
 
-  const endAttendance = () => {
+  const endAttendance = (note = "") => {
     if (!currentSession) return;
-    if (
-      !window.confirm(
-        "End this session? Remaining absent students will be marked ABSENT.",
-      )
-    )
-      return;
     setActionLoading(true);
     setError("");
     setSuccess("");
     api
-      .put(`/attendance/session/${currentSession.id}/end`)
+      .put(`/attendance/session/${currentSession.id}/end`, { notes: note })
       .then(() => {
         setCurrentSession(null);
         setSuccess("✅ Session ended.");
@@ -360,6 +358,12 @@ function TeacherDashboard({ dark, toggleDark }) {
         setError(err.response?.data?.message || "Failed to end session.");
         setActionLoading(false);
       });
+  };
+
+  const openEndModal = () => {
+    if (!currentSession) return;
+    setEndNoteText("");
+    setShowEndModal(true);
   };
 
   const viewAttendanceHistory = () => {
@@ -1139,33 +1143,64 @@ function TeacherDashboard({ dark, toggleDark }) {
                     No sessions yet.
                   </div>
                 ) : (
-                  attendanceHistory.sessions.map((session) => (
-                    <div key={session.id} className="session-item">
-                      <div className="session-date">
-                        {formatDate(session.date)}
-                      </div>
-                      <div className="session-details">
-                        <span>
-                          {formatTime(session.scheduledStart)} –{" "}
-                          {formatTime(session.scheduledEnd)}
-                        </span>
-                        <span
-                          className="session-status"
-                          style={{ color: "var(--green)" }}
+                  attendanceHistory.sessions.map((session) => {
+                    const isHovered = hoveredSessionId === session.id;
+                    const note = session.endNote;
+                    const truncated =
+                      note && note.length > 55
+                        ? note.slice(0, 55) + "…"
+                        : note;
+                    return (
+                      <div key={session.id} className="session-item">
+                        <div className="session-date">
+                          {formatDate(session.date)}
+                        </div>
+                        {note && (
+                          <div
+                            onMouseEnter={() =>
+                              setHoveredSessionId(session.id)
+                            }
+                            onMouseLeave={() => setHoveredSessionId(null)}
+                            style={{
+                              fontSize: "12px",
+                              color: "var(--ink-muted)",
+                              fontStyle: "italic",
+                              maxWidth: "420px",
+                              overflow: "hidden",
+                              whiteSpace: isHovered ? "normal" : "nowrap",
+                              textOverflow: isHovered ? "unset" : "ellipsis",
+                              cursor: "default",
+                              transition: "all 0.15s ease",
+                              padding: "2px 0",
+                            }}
+                            title={note}
+                          >
+                            📝 {isHovered ? note : truncated}
+                          </div>
+                        )}
+                        <div className="session-details">
+                          <span>
+                            {formatTime(session.scheduledStart)} –{" "}
+                            {formatTime(session.scheduledEnd)}
+                          </span>
+                          <span
+                            className="session-status"
+                            style={{ color: "var(--green)" }}
+                          >
+                            {session.status}
+                          </span>
+                        </div>
+                        <button
+                          className="btn-icon"
+                          style={{ color: "var(--sky-dark)" }}
+                          onClick={() => exportSessionCSV(session)}
+                          title="Export session"
                         >
-                          {session.status}
-                        </span>
+                          ↓
+                        </button>
                       </div>
-                      <button
-                        className="btn-icon"
-                        style={{ color: "var(--sky-dark)" }}
-                        onClick={() => exportSessionCSV(session)}
-                        title="Export session"
-                      >
-                        ↓
-                      </button>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -1187,6 +1222,114 @@ function TeacherDashboard({ dark, toggleDark }) {
         onToggleDark={toggleDark}
         onLogout={handleLogout}
       />
+
+      {/* ── End Session Modal ── */}
+      {showEndModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "12px",
+              padding: "24px",
+              width: "100%",
+              maxWidth: "420px",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "16px",
+                fontWeight: 700,
+                color: "var(--ink)",
+                marginBottom: "6px",
+              }}
+            >
+              End Session
+            </div>
+            <p
+              style={{
+                fontSize: "13px",
+                color: "var(--ink-muted)",
+                margin: "0 0 14px",
+              }}
+            >
+              Remaining unscanned students will be marked <strong>ABSENT</strong>.
+              You can optionally add a note for this session.
+            </p>
+            <textarea
+              autoFocus
+              rows={3}
+              value={endNoteText}
+              onChange={(e) => setEndNoteText(e.target.value)}
+              placeholder="e.g. Class ended early due to…"
+              style={{
+                width: "100%",
+                resize: "vertical",
+                padding: "8px 10px",
+                borderRadius: "7px",
+                border: "1px solid var(--border)",
+                background: "var(--surface2)",
+                color: "var(--ink)",
+                fontSize: "13px",
+                fontFamily: "inherit",
+                boxSizing: "border-box",
+                marginBottom: "16px",
+              }}
+            />
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                justifyContent: "flex-end",
+                flexWrap: "wrap",
+              }}
+            >
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => {
+                  setShowEndModal(false);
+                  setEndNoteText("");
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  setShowEndModal(false);
+                  setEndNoteText("");
+                  endAttendance("");
+                }}
+              >
+                End &amp; Ignore
+              </button>
+              <button
+                className="btn btn-danger btn-sm"
+                disabled={!endNoteText.trim()}
+                onClick={() => {
+                  const note = endNoteText.trim();
+                  setShowEndModal(false);
+                  setEndNoteText("");
+                  endAttendance(note);
+                }}
+              >
+                End &amp; Add Note
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="main-area">
         <div className="topbar">
           <span className="tb-title">
@@ -1343,7 +1486,7 @@ function TeacherDashboard({ dark, toggleDark }) {
                   </button>
                   <button
                     className="btn btn-danger btn-sm"
-                    onClick={endAttendance}
+                    onClick={openEndModal}
                     disabled={actionLoading}
                   >
                     {actionLoading ? "Ending…" : "End Session"}
