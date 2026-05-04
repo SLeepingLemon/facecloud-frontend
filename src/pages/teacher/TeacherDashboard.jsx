@@ -1146,14 +1146,43 @@ function TeacherDashboard({ dark, toggleDark }) {
                   attendanceHistory.sessions.map((session) => {
                     const isHovered = hoveredSessionId === session.id;
                     const note = session.endNote;
-                    const truncated =
-                      note && note.length > 55
-                        ? note.slice(0, 55) + "…"
-                        : note;
                     return (
-                      <div key={session.id} className="session-item">
-                        <div className="session-date">
-                          {formatDate(session.date)}
+                      <div
+                        key={session.id}
+                        className="session-item"
+                        style={{ flexDirection: "column", alignItems: "stretch" }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: "12px",
+                          }}
+                        >
+                          <div className="session-date">
+                            {formatDate(session.date)}
+                          </div>
+                          <div className="session-details">
+                            <span>
+                              {formatTime(session.scheduledStart)} –{" "}
+                              {formatTime(session.scheduledEnd)}
+                            </span>
+                            <span
+                              className="session-status"
+                              style={{ color: "var(--green)" }}
+                            >
+                              {session.status}
+                            </span>
+                          </div>
+                          <button
+                            className="btn-icon"
+                            style={{ color: "var(--sky-dark)" }}
+                            onClick={() => exportSessionCSV(session)}
+                            title="Export session"
+                          >
+                            ↓
+                          </button>
                         </div>
                         {note && (
                           <div
@@ -1165,39 +1194,20 @@ function TeacherDashboard({ dark, toggleDark }) {
                               fontSize: "12px",
                               color: "var(--ink-muted)",
                               fontStyle: "italic",
-                              maxWidth: "420px",
-                              overflow: "hidden",
+                              textAlign: "center",
+                              overflow: isHovered ? "visible" : "hidden",
                               whiteSpace: isHovered ? "normal" : "nowrap",
                               textOverflow: isHovered ? "unset" : "ellipsis",
                               cursor: "default",
                               transition: "all 0.15s ease",
-                              padding: "2px 0",
+                              borderTop: "1px solid var(--border)",
+                              marginTop: "8px",
+                              paddingTop: "6px",
                             }}
-                            title={note}
                           >
-                            📝 {isHovered ? note : truncated}
+                            📝 {note}
                           </div>
                         )}
-                        <div className="session-details">
-                          <span>
-                            {formatTime(session.scheduledStart)} –{" "}
-                            {formatTime(session.scheduledEnd)}
-                          </span>
-                          <span
-                            className="session-status"
-                            style={{ color: "var(--green)" }}
-                          >
-                            {session.status}
-                          </span>
-                        </div>
-                        <button
-                          className="btn-icon"
-                          style={{ color: "var(--sky-dark)" }}
-                          onClick={() => exportSessionCSV(session)}
-                          title="Export session"
-                        >
-                          ↓
-                        </button>
                       </div>
                     );
                   })
